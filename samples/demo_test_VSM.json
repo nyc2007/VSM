@@ -1,0 +1,102 @@
+{
+  "value_stream_meta": {
+    "name": "演示用 现状价值流",
+    "state": "current",
+    "product": "测试件",
+    "available_time_minutes": 480,
+    "batch_size": 1
+  },
+  "macro_entities": {
+    "supplier": { "name": "供应商" },
+    "customer": { "name": "客户" },
+    "production_control": { "name": "生产计划部" }
+  },
+  "macro_flows": [
+    {
+      "from": "production_control",
+      "to": "supplier",
+      "type": "electronic_info",
+      "content": "采购/到货计划"
+    },
+    {
+      "from": "production_control",
+      "to": "customer",
+      "type": "electronic_info",
+      "content": "日计划/派工"
+    }
+  ],
+  "inbound": {
+    "label": "原材料入库",
+    "wait_time_minutes": 1440,
+    "inventory_qty": 1
+  },
+  "outbound": {
+    "label": "成品发运"
+  },
+  "processes": [
+    {
+      "id": "P01",
+      "name": "下料",
+      "predecessors": [],
+      "timeline": {
+        "wait_time_minutes": 1440,
+        "setup_time_minutes": 30,
+        "cycle_time_minutes": 60,
+        "raw_process_minutes": 60,
+        "inventory_qty": 1
+      },
+      "resources": ["下料工位"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.9,
+        "quality_yield": 1.0,
+        "available_time_minutes": 480,
+        "batch_size": 1
+      },
+      "data_status": "已有+模拟"
+    },
+    {
+      "id": "P02",
+      "name": "机加",
+      "predecessors": ["P01"],
+      "timeline": {
+        "wait_time_minutes": 2880,
+        "setup_time_minutes": 120,
+        "cycle_time_minutes": 240,
+        "raw_process_minutes": 240,
+        "inventory_qty": 1
+      },
+      "resources": ["数控机床"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480,
+        "batch_size": 1
+      },
+      "is_bottleneck": true,
+      "data_status": "已有+模拟"
+    },
+    {
+      "id": "P03",
+      "name": "检验",
+      "predecessors": ["P02"],
+      "timeline": {
+        "wait_time_minutes": 720,
+        "setup_time_minutes": 15,
+        "cycle_time_minutes": 30,
+        "raw_process_minutes": 0,
+        "inventory_qty": 1
+      },
+      "resources": ["检验"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.9,
+        "quality_yield": 1.0,
+        "available_time_minutes": 480,
+        "batch_size": 1
+      },
+      "data_status": "模拟补充"
+    }
+  ]
+}

@@ -1,0 +1,337 @@
+{
+  "value_stream_meta": {
+    "name": "前汽缸精加工下半 现状价值流",
+    "state": "current",
+    "source_file": "_select_opi_order_id_as_..._202610201004.csv",
+    "product": "前汽缸精加工下半",
+    "drawing_no": "E296.01.01.01+2",
+    "order_id": "020002862461",
+    "take_off_id": "",
+    "make_order": "TP2H24-05-17",
+    "available_time_minutes": 480.0,
+    "batch_size": 1.0,
+    "note": "C/T取该工序号下单条计划跨度最大值(天)×1440; 等待取工序号顺序下前序计划结束到本序计划开始的日历间隙(重叠则0)"
+  },
+  "macro_entities": {
+    "supplier": {
+      "name": "上游/毛坯或半成品转入"
+    },
+    "customer": {
+      "name": "下游装配/入库"
+    },
+    "production_control": {
+      "name": "MES排程/车间调度"
+    }
+  },
+  "macro_flows": [
+    {
+      "from": "production_control",
+      "to": "supplier",
+      "type": "electronic_info",
+      "content": "生产订单/暂脱单/计划日期"
+    },
+    {
+      "from": "production_control",
+      "to": "customer",
+      "type": "electronic_info",
+      "content": "派工/完工反馈"
+    }
+  ],
+  "inbound": {
+    "label": "半成品转入",
+    "wait_time_minutes": 4320.0,
+    "inventory_qty": 1.0
+  },
+  "outbound": {
+    "label": "精加工完工转出"
+  },
+  "processes": [
+    {
+      "id": "P01",
+      "name": "0101 铣准喷嘴窗口及隔筋",
+      "predecessors": [],
+      "timeline": {
+        "wait_time_minutes": 4320.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 2880.0,
+        "raw_process_minutes": 2880.0
+      },
+      "resources": [
+        "道斯（东）"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P02",
+      "name": "0201 精铣中分面加工孔",
+      "predecessors": [
+        "P01"
+      ],
+      "timeline": {
+        "wait_time_minutes": 0.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 8640.0,
+        "raw_process_minutes": 8640.0
+      },
+      "resources": [
+        "新200镗床",
+        "道斯（东）"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P03",
+      "name": "0301 加工孔(0301)",
+      "predecessors": [
+        "P02"
+      ],
+      "timeline": {
+        "wait_time_minutes": 0.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 2880.0,
+        "raw_process_minutes": 2880.0
+      },
+      "resources": [
+        "道斯（东）"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P04",
+      "name": "0501 铰锥销孔",
+      "predecessors": [
+        "P03"
+      ],
+      "timeline": {
+        "wait_time_minutes": 2880.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 1440.0,
+        "raw_process_minutes": 1440.0
+      },
+      "resources": [
+        "025-115摇臂钻床"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P05",
+      "name": "0601 精车",
+      "predecessors": [
+        "P04"
+      ],
+      "timeline": {
+        "wait_time_minutes": 15840.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 14400.0,
+        "raw_process_minutes": 14400.0
+      },
+      "resources": [
+        "5米立车（1.5跨东）",
+        "老5米立车(1.5 西)"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)",
+      "is_bottleneck": true
+    },
+    {
+      "id": "P06",
+      "name": "0701 加工孔(0701)",
+      "predecessors": [
+        "P05"
+      ],
+      "timeline": {
+        "wait_time_minutes": 23040.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 12960.0,
+        "raw_process_minutes": 12960.0
+      },
+      "resources": [
+        "道斯（东）"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P07",
+      "name": "0801 加工孔(0801)",
+      "predecessors": [
+        "P06"
+      ],
+      "timeline": {
+        "wait_time_minutes": 0.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 1440.0,
+        "raw_process_minutes": 1440.0
+      },
+      "resources": [
+        "道斯（东）"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P08",
+      "name": "1101 精铣(1101)",
+      "predecessors": [
+        "P07"
+      ],
+      "timeline": {
+        "wait_time_minutes": 1440.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 4320.0,
+        "raw_process_minutes": 4320.0
+      },
+      "resources": [
+        "道斯（东）"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P09",
+      "name": "1201 加工孔(1201)",
+      "predecessors": [
+        "P08"
+      ],
+      "timeline": {
+        "wait_time_minutes": 0.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 1440.0,
+        "raw_process_minutes": 1440.0
+      },
+      "resources": [
+        "025-115摇臂钻床"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P10",
+      "name": "1601 去泵水闷板",
+      "predecessors": [
+        "P09"
+      ],
+      "timeline": {
+        "wait_time_minutes": 51840.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 1440.0,
+        "raw_process_minutes": 1440.0
+      },
+      "resources": [
+        "中捷130"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    },
+    {
+      "id": "P11",
+      "name": "1701 精铣(1701)",
+      "predecessors": [
+        "P10"
+      ],
+      "timeline": {
+        "wait_time_minutes": 0.0,
+        "inventory_qty": 1.0,
+        "setup_time_minutes": 60.0,
+        "cycle_time_minutes": 7200.0,
+        "raw_process_minutes": 7200.0
+      },
+      "resources": [
+        "中捷130"
+      ],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "quality_yield": 0.98,
+        "available_time_minutes": 480.0,
+        "batch_size": 1.0,
+        "performance_rate": 0.9
+      },
+      "data_status": "计划日历推算(C/T=计划天数×1440)"
+    }
+  ]
+}

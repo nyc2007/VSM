@@ -1,0 +1,3849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VSM 绘制工具（Macro JSON 版）</title>
+    <style>
+        :root {
+            --zone-info: #ef9a9a;
+            --zone-mat: #90caf9;
+            --zone-time: #fff59d;
+            --proc-bg: #b3e5fc;
+            --inv-bg: #fff59d;
+            --pc-header: #ffcc80;
+            --mat-arrow: #1565c0;
+            --black: #000;
+            --red: #c62828;
+            --green: #2e7d32;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #eceff1;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            background: #fff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.1);
+        }
+        header h1 { margin: 0 0 4px; font-size: 18px; }
+        header p { margin: 0; font-size: 12px; color: #555; }
+        .layout { display: flex; gap: 12px; flex: 1; min-height: 0; }
+        .panel {
+            background: #fff;
+            border: 1px solid #cfd8dc;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .input-panel { flex: 2; min-width: 280px; }
+        .output-panel { flex: 5; overflow: auto; min-height: 0; }
+        .output-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+        .output-toolbar button {
+            margin: 0;
+        }
+        .output-toolbar button.outline {
+            background: #fff;
+            color: #1565c0;
+            border: 1px solid #1565c0;
+        }
+        .output-toolbar button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .output-toolbar .hint {
+            margin: 0;
+        }
+        .output-toolbar button.active-panel {
+            background: #1565c0;
+            color: #fff;
+            border-color: #1565c0;
+        }
+        .output-body {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+            min-height: 0;
+            flex: 1;
+        }
+        .output-body #output {
+            flex: 1;
+            min-width: 0;
+            overflow: auto;
+        }
+        .metrics-panel {
+            display: none;
+            width: 380px;
+            max-width: 42vw;
+            flex-shrink: 0;
+            border: 1px solid #cfd8dc;
+            border-radius: 8px;
+            background: #fafafa;
+            overflow: hidden;
+            flex-direction: column;
+            max-height: calc(100vh - 160px);
+        }
+        .metrics-panel.open { display: flex; }
+        .metrics-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #1565c0;
+            color: #fff;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .metrics-panel-header button {
+            margin: 0;
+            padding: 4px 10px;
+            background: rgba(255,255,255,.2);
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .metrics-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #cfd8dc;
+            background: #fff;
+        }
+        .metrics-tabs button {
+            flex: 1;
+            margin: 0;
+            padding: 8px 4px;
+            border-radius: 0;
+            background: #fff;
+            color: #455a64;
+            font-size: 11px;
+            font-weight: normal;
+            border-bottom: 2px solid transparent;
+        }
+        .metrics-tabs button.active {
+            color: #1565c0;
+            font-weight: bold;
+            border-bottom-color: #1565c0;
+            background: #e3f2fd;
+        }
+        .metrics-panel-body {
+            flex: 1;
+            overflow: auto;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #333;
+        }
+        .metrics-panel-body h4 {
+            margin: 12px 0 6px;
+            font-size: 12px;
+            color: #1565c0;
+        }
+        .metrics-panel-body h4:first-child { margin-top: 0; }
+        .metrics-kv {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+            background: #fff;
+        }
+        .metrics-kv th, .metrics-kv td {
+            border: 1px solid #e0e0e0;
+            padding: 5px 7px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .metrics-kv th {
+            background: #eceff1;
+            width: 42%;
+            font-weight: 600;
+            color: #455a64;
+        }
+        .metrics-kv tr.highlight td {
+            background: #fff8e1;
+        }
+        .metrics-kv tr.danger td {
+            background: #ffebee;
+        }
+        .prov {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 0 5px;
+            border-radius: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        .prov-input { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .prov-derived { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+        .prov-quality {
+            display: inline-block;
+            font-size: 10px;
+            color: #888;
+            margin-left: 2px;
+        }
+        .prov-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 10px;
+            padding: 8px;
+            margin-bottom: 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #555;
+        }
+        .prov-legend .item { display: flex; align-items: center; gap: 4px; }
+        .prov-summary {
+            font-size: 11px;
+            color: #555;
+            margin: 0 0 8px;
+            line-height: 1.5;
+        }
+        .metrics-formula {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .metrics-formula .name { font-weight: bold; color: #1565c0; }
+        .metrics-formula .eq {
+            font-family: Consolas, 'Microsoft YaHei', monospace;
+            font-size: 11px;
+            color: #37474f;
+            margin: 4px 0;
+            word-break: break-all;
+        }
+        .metrics-formula .note { font-size: 11px; color: #78909c; }
+        .metrics-empty {
+            color: #78909c;
+            font-size: 12px;
+            padding: 16px 8px;
+            text-align: center;
+        }
+        #output { min-width: 0; }
+        textarea {
+            flex: 1;
+            min-height: 300px;
+            width: 100%;
+            font: 12px Consolas, monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 4px;
+            padding: 8px;
+            border: 1px solid #444;
+        }
+        button {
+            margin-top: 8px;
+            padding: 9px 16px;
+            background: #1565c0;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+        .tabs button { margin: 0; background: #e0e0e0; color: #333; font-weight: normal; }
+        .tabs button.active { background: #1565c0; color: #fff; }
+        .error { display: none; margin-top: 8px; padding: 8px; background: #ffcdd2; color: #b71c1c; font-size: 12px; border-radius: 4px; }
+        .notice { display: none; margin-top: 8px; padding: 8px; background: #fff8e1; color: #e65100; font-size: 12px; border-radius: 4px; border: 1px solid #ffcc80; }
+        .hint { font-size: 11px; color: #777; margin-top: 6px; }
+        .excel-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .excel-toolbar button { margin-top: 0; }
+        .excel-toolbar button.secondary {
+            background: #546e7a;
+        }
+        .excel-toolbar button.outline {
+            background: #fff;
+            color: #1565c0;
+            border: 1px solid #1565c0;
+        }
+        .excel-toolbar input[type="file"] { display: none; }
+        .excel-status {
+            font-size: 11px;
+            color: #2e7d32;
+            margin-top: 4px;
+            display: none;
+        }
+        .input-mode-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+        .input-mode-tabs button {
+            flex: 1;
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 12px;
+            background: #eceff1;
+            color: #455a64;
+            font-weight: normal;
+        }
+        .input-mode-tabs button.active {
+            background: #1565c0;
+            color: #fff;
+            font-weight: bold;
+        }
+        .input-mode-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .nl-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        .nl-panel.active { display: flex; }
+        .json-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        .json-panel.active { display: flex; }
+        .nl-desc {
+            flex: 1;
+            min-height: 280px;
+            width: 100%;
+            font: 12px 'Microsoft YaHei', sans-serif;
+            border-radius: 4px;
+            padding: 8px;
+            border: 1px solid #b0bec5;
+            resize: vertical;
+            line-height: 1.5;
+        }
+        .nl-config {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin: 8px 0;
+            font-size: 11px;
+        }
+        .nl-config label { display: flex; flex-direction: column; gap: 2px; color: #546e7a; }
+        .nl-config label.full { grid-column: 1 / -1; }
+        .nl-config input, .nl-config select {
+            padding: 6px 8px;
+            border: 1px solid #b0bec5;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .nl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+        .nl-actions button { margin-top: 0; }
+        .nl-actions button.secondary { background: #546e7a; }
+        .nl-actions button:disabled { opacity: 0.55; cursor: not-allowed; }
+        .nl-hint { font-size: 11px; color: #777; margin: 0 0 8px; line-height: 1.45; }
+
+        .vsm-template { min-width: max-content; padding: 8px; }
+        .vsm-zone {
+            position: relative;
+            border: 2px dashed;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            padding: 28px 12px 12px;
+        }
+        .vsm-zone.info { border-color: var(--zone-info); background: rgba(239,154,154,.08); }
+        .vsm-zone.material { border-color: var(--zone-mat); background: rgba(144,202,249,.08); }
+        .vsm-zone.timeline { border-color: var(--zone-time); background: rgba(255,245,157,.12); }
+        .zone-badge {
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 2px 10px;
+            border-radius: 3px;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,.2);
+        }
+        .vsm-zone.info .zone-badge { color: #b71c1c; }
+        .vsm-zone.material .zone-badge { color: #0d47a1; }
+        .vsm-zone.timeline .zone-badge { color: #f57f17; }
+        .vsm-grid { display: flex; align-items: stretch; }
+        .vsm-col { flex-shrink: 0; display: flex; flex-direction: column; position: relative; }
+        .col-truck { width: 88px; }
+        .col-link { width: 96px; }
+        .col-process { width: 128px; }
+
+        .info-band { height: 88px; position: relative; }
+        .info-entity {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+            padding-bottom: 4px;
+        }
+        .info-entity .lbl {
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            max-width: 84px;
+            line-height: 1.2;
+            margin-top: 2px;
+            min-height: 24px;
+        }
+        .pc-wrap {
+            position: absolute;
+            top: 4px;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+        .pc-box {
+            border: 2px solid var(--black);
+            background: #fff;
+            width: 150px;
+            min-width: 150px;
+            text-align: center;
+            box-shadow: 2px 2px 0 rgba(0,0,0,.15);
+        }
+        .pc-header {
+            background: var(--pc-header);
+            border-bottom: 2px solid var(--black);
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .info-stage { position: relative; }
+        .info-stage .vsm-grid {
+            position: absolute;
+            left: 0;
+            top: var(--info-grid-top);
+            width: 100%;
+            z-index: 2;
+        }
+        .info-stage .pc-wrap { top: var(--info-pc-top); }
+        .info-flow-svg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 6; /* 高于 pc-wrap(5)，避免折线被计划框遮挡 */
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        .vsm-zone.material {
+            --process-top: 56px;
+            --process-h: 40px;
+            --arrow-h: 16px;
+            --flow-center: calc(var(--process-top) + var(--process-h) / 2);
+            --arrow-top: calc(var(--flow-center) - var(--arrow-h) / 2);
+            --arrow-bottom: calc(var(--flow-center) + var(--arrow-h) / 2);
+            --inv-gap: 8px;
+            --inv-top: calc(var(--arrow-bottom) + var(--inv-gap));
+        }
+        .mat-band { min-height: 200px; position: relative; padding-top: 8px; }
+        .mat-arrow-row {
+            position: absolute;
+            top: var(--arrow-top);
+            left: 0;
+            width: 100%;
+            height: var(--arrow-h);
+            z-index: 1;
+        }
+        .col-process .mat-band { padding-top: 0; }
+        .mat-inv-row {
+            position: absolute;
+            top: var(--inv-top);
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+        .inv-qty-below { font-size: 11px; font-weight: bold; margin-top: 2px; }
+        .mat-process {
+            margin-top: var(--process-top);
+            width: 100%;
+            min-height: var(--process-h);
+            height: var(--process-h);
+            background: var(--proc-bg);
+            border: 2px solid var(--black);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 4px;
+            position: relative;
+            z-index: 3;
+        }
+        .mat-process.bottleneck {
+            background: #ffecb3;
+            border-color: #e65100;
+            box-shadow: inset 0 0 0 1px #ff9800;
+        }
+        .vsm-edit-name,
+        .vsm-edit-entity,
+        .vsm-edit-flow {
+            cursor: pointer;
+            border-bottom: 1px dashed transparent;
+            line-height: 1.25;
+        }
+        .vsm-edit-name:hover,
+        .vsm-edit-entity:hover,
+        .vsm-edit-flow:hover {
+            border-bottom-color: #1565c0;
+            color: #0d47a1;
+        }
+        .vsm-edit-name-input {
+            flex: 1;
+            min-width: 0;
+            font: inherit;
+            font-weight: bold;
+            font-size: 11px;
+            text-align: center;
+            border: 2px solid #1565c0;
+            border-radius: 2px;
+            padding: 2px 4px;
+            box-sizing: border-box;
+            background: #fff;
+            outline: none;
+        }
+        .info-entity .vsm-edit-name-input {
+            font-size: 10px;
+            max-width: 84px;
+        }
+        .pc-header .vsm-edit-name-input {
+            width: 100%;
+            min-width: 72px;
+            font-size: 11px;
+            padding: 1px 4px;
+        }
+        .mat-truck .vsm-edit-name-input,
+        .mat-graph-truck .vsm-edit-name-input {
+            font-size: 9px;
+            max-width: 80px;
+        }
+        .mat-operator { position: absolute; top: -14px; right: 4px; }
+        .mat-data {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+            margin-top: 4px;
+            background: #e3f2fd;
+        }
+        .mat-data td { border: 1px solid var(--black); padding: 2px 3px; text-align: center; }
+        .mat-data .vsm-edit-data {
+            cursor: pointer;
+        }
+        .mat-data .vsm-edit-data:hover {
+            color: #0d47a1;
+            background: #bbdefb;
+        }
+        .mat-data .vsm-edit-name-input {
+            width: 100%;
+            max-width: none;
+            font-size: 9px;
+            padding: 1px 2px;
+        }
+        .mat-truck {
+            position: absolute;
+            top: var(--flow-center);
+            left: 0;
+            width: 100%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+        .mat-truck .lbl { font-size: 9px; font-weight: bold; margin-top: 4px; text-align: center; }
+        .vsm-zone.material .vsm-grid > .col-truck:last-child .mat-arrow-row { width: 58%; }
+        .vsm-zone.material .vsm-grid > .col-truck:last-child .mat-truck {
+            left: auto;
+            right: 0;
+            width: auto;
+        }
+
+        .timeline-track { position: relative; margin: 10px 8px 0; min-height: 72px; }
+        .timeline-track.graph-aligned { margin: 10px 4px 0; }
+        .timeline-track svg { display: block; overflow: visible; }
+        .timeline-cp-hint {
+            font-size: 10px;
+            color: #666;
+            margin: 4px 8px 0;
+            font-style: italic;
+        }
+        .timeline-cp-hint.graph-aligned { margin: 4px 4px 0; }
+        .timeline-summary {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border: 2px solid var(--black);
+            background: #fff;
+            font-size: 12px;
+            line-height: 1.6;
+            display: inline-block;
+            float: right;
+            clear: both;
+        }
+        .timeline-summary strong { display: block; }
+
+        .symbol-sheet { padding: 8px 12px 24px; }
+        .symbol-sheet h2 { font-size: 16px; margin: 0 0 6px; border-bottom: 2px solid #000; padding-bottom: 6px; }
+        .symbol-sheet .note { font-size: 12px; color: #555; margin-bottom: 12px; }
+        .symbol-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .symbol-table th, .symbol-table td { border: 1px solid #000; padding: 10px 8px; vertical-align: middle; }
+        .symbol-table th { background: #eceff1; text-align: left; }
+        .symbol-cell { width: 150px; text-align: center; background: #fafafa; }
+        .symbol-cell svg { display: block; margin: 0 auto; }
+        .symbol-cell .role-hint { font-size: 10px; color: #666; margin-top: 4px; }
+
+        /* 步骤 3：分叉图物料流（仅物料区使用绝对定位） */
+        .mat-canvas {
+            position: relative;
+            overflow: visible;
+            margin: 0 4px;
+        }
+        .mat-flow-svg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            pointer-events: none;
+            z-index: 1;
+            overflow: visible;
+        }
+        .mat-graph-truck {
+            position: absolute;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 2;
+        }
+        .mat-graph-truck .lbl { font-size: 9px; font-weight: bold; margin-top: 4px; text-align: center; max-width: 80px; }
+        .mat-graph-node {
+            position: absolute;
+            width: 128px;
+            z-index: 2;
+        }
+        .mat-graph-node .mat-process {
+            margin-top: 0;
+            height: 40px;
+            min-height: 40px;
+        }
+        .mat-edge-inv {
+            position: absolute;
+            left: 0;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 3;
+            pointer-events: none;
+        }
+        .mat-edge-inv .inv-qty-below { font-size: 10px; font-weight: bold; margin-top: 2px; }
+        .mat-edge-wait {
+            position: absolute;
+            left: 0;
+            transform: translate(-50%, -100%);
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--red);
+            z-index: 3;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>VSM 绘制工具（Macro JSON 版）</h1>
+        <p>支持自然语言生成、Excel 导入、macro_entities / macro_flows / predecessors 格式</p>
+    </header>
+    <div class="layout">
+        <div class="panel input-panel">
+            <div class="tabs">
+                <button type="button" id="tab-map" class="active" onclick="switchTab('map')">价值流图</button>
+                <button type="button" id="tab-symbols" onclick="switchTab('symbols')">标准符号表</button>
+            </div>
+            <div class="input-mode-tabs" id="input-mode-tabs">
+                <button type="button" id="input-nl" class="active" onclick="switchInputMode('nl')">自然语言</button>
+                <button type="button" id="input-json" onclick="switchInputMode('json')">JSON / Excel</button>
+            </div>
+            <div class="input-mode-body" id="input-mode-body">
+                <div class="nl-panel active" id="nl-panel">
+                    <p class="nl-hint">用中文描述价值流，生成后将同时得到 Excel（自动下载）与 JSON，并自动切换到「JSON / Excel」页核对。</p>
+                    <textarea id="nl-input" class="nl-desc" spellcheck="false" placeholder="示例：某汽轮机叶片加工，4 道工序…"></textarea>
+                    <div class="nl-config">
+                        <label>API 提供商
+                            <select id="nl-provider" onchange="applyNlProviderPreset()">
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </label>
+                        <label>模型
+                            <input type="text" id="nl-model" value="deepseek-chat">
+                        </label>
+                        <label class="full">API Base URL
+                            <input type="text" id="nl-base-url" value="https://api.deepseek.com">
+                        </label>
+                        <label class="full">API Key（仅保存在本浏览器本次会话）
+                            <input type="password" id="nl-api-key" placeholder="sk-..." autocomplete="off">
+                        </label>
+                    </div>
+                    <div class="nl-actions">
+                        <button type="button" id="btn-nl-generate" onclick="generateJsonFromNaturalLanguage()">生成 Excel + JSON 并渲染</button>
+                        <button type="button" class="secondary" onclick="fillNlExample()">填入示例描述</button>
+                    </div>
+                </div>
+                <div class="json-panel" id="json-panel">
+                    <div class="excel-toolbar" id="excel-toolbar">
+                        <button type="button" class="outline" onclick="downloadExcelTemplate()">下载 Excel 模板</button>
+                        <button type="button" class="outline" onclick="downloadCurrentJsonAsExcel()">下载当前 Excel</button>
+                        <button type="button" class="secondary" onclick="document.getElementById('excel-file').click()">导入 Excel</button>
+                        <input type="file" id="excel-file" accept=".xlsx,.xls,.csv" onchange="importExcelFile(this.files[0])">
+                    </div>
+                    <textarea id="json-input" spellcheck="false"></textarea>
+                    <button type="button" id="btn-render" onclick="render()">渲染</button>
+                </div>
+            </div>
+            <div class="error" id="error"></div>
+        </div>
+        <div class="panel output-panel">
+            <div class="output-toolbar">
+                <button type="button" class="outline" id="btn-save-image" onclick="saveVsmAsImage()">保存 VSM 为图片</button>
+                <button type="button" class="outline" id="btn-export-drawio" onclick="downloadDrawio()" title="导出为 .drawio，可用 diagrams.net 打开微调">导出 Draw.io</button>
+                <button type="button" class="outline" id="btn-metrics" onclick="toggleMetricsPanel()">关键参数面板</button>
+            </div>
+            <div class="output-body">
+                <div id="output"></div>
+                <aside class="metrics-panel" id="metrics-panel" aria-label="关键参数面板">
+                    <div class="metrics-panel-header">
+                        <span>关键参数与计算公式</span>
+                        <button type="button" onclick="toggleMetricsPanel(false)">关闭</button>
+                    </div>
+                    <div class="metrics-tabs" id="metrics-tabs">
+                        <button type="button" class="active" data-tab="overview" onclick="switchMetricsTab('overview')">总览</button>
+                        <button type="button" data-tab="process" onclick="switchMetricsTab('process')">工序</button>
+                        <button type="button" data-tab="loss" onclick="switchMetricsTab('loss')">损失Top</button>
+                        <button type="button" data-tab="formula" onclick="switchMetricsTab('formula')">公式</button>
+                    </div>
+                    <div class="metrics-panel-body" id="metrics-panel-body">
+                        <div class="metrics-empty">请先渲染价值流图，再打开本面板。</div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+    const LAYOUT = { truck: 88, link: 96, process: 128 };
+
+    /** 分叉图布局常量（步骤 2 仅计算坐标，步骤 3 才用于绘制） */
+    const GRAPH_LAYOUT = {
+        paddingTop: 36,
+        laneH: 200
+    };
+
+    const INFO = {
+        gridTop: 28,
+        bandH: 88,
+        pcTop: 4,
+        pcH: 30,
+        entSvgH: 52,
+        entLabelH: 26,
+        entPadBottom: 4
+    };
+    INFO.stageH = INFO.gridTop + INFO.bandH;
+    INFO.entTopY = INFO.gridTop + INFO.bandH - INFO.entPadBottom - INFO.entLabelH - INFO.entSvgH;
+    INFO.pcTopY = INFO.pcTop;
+    INFO.pcBottomY = INFO.pcTop + INFO.pcH;
+    INFO.pcMinW = 150;
+    INFO.pcHalfW = INFO.pcMinW / 2;
+    INFO.pcSideY = (INFO.pcTopY + INFO.pcBottomY) / 2;
+    /* 入/出两条水平路由错开，避免重叠且保证可见弯折 */
+    INFO.inLaneY = INFO.pcSideY - 5;
+    INFO.outLaneY = INFO.pcSideY + 5;
+
+    /* ========== Macro JSON 适配层 ========== */
+
+    function isMacroFormat(raw) {
+        return !!(raw.macro_entities || raw.macro_flows);
+    }
+
+    function mapFlowEntity(name) {
+        const key = String(name ?? '').toLowerCase().replace(/-/g, '_');
+        const table = {
+            customer: 'CUSTOMER',
+            supplier: 'SUPPLIER',
+            production_control: 'PC',
+            pc: 'PC',
+            erp: 'PC'
+        };
+        return table[key] || String(name).toUpperCase();
+    }
+
+    /** 统一 macro_flows / flows 字段，并规范化端点名 */
+    function normalizeFlowEntry(f) {
+        if (!f || typeof f !== 'object') return null;
+        return {
+            from: mapFlowEntity(f.from),
+            to: mapFlowEntity(f.to),
+            type: f.type || 'electronic_info',
+            content: f.content
+        };
+    }
+
+    function collectFlows(raw) {
+        const seen = new Set();
+        const out = [];
+        [...(raw.macro_flows || []), ...(raw.flows || [])].forEach((f) => {
+            const n = normalizeFlowEntry(f);
+            if (!n) return;
+            const key = `${n.from}|${n.to}|${n.type}|${n.content || ''}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            out.push(n);
+        });
+        return out;
+    }
+
+    function minutesToDuration(minutes) {
+        if (minutes == null || minutes === '') return '';
+        let min = minutes;
+        if (typeof min === 'object') {
+            const a = Number(min.min) || 0;
+            const b = Number(min.max) || a;
+            if (a !== b) return `${minutesToDuration(a)}~${minutesToDuration(b)}`;
+            min = a;
+        }
+        min = Number(min);
+        if (!Number.isFinite(min) || min <= 0) return '0';
+        if (min >= 1440 && min % 1440 === 0) return `${min / 1440}d`;
+        if (min >= 60 && min % 60 === 0) return `${min / 60}h`;
+        if (min >= 60) return `${Math.round(min / 60 * 10) / 10}h`;
+        return `${Math.round(min)}min`;
+    }
+
+    function minutesToLeadTimeLabel(minutes) {
+        const min = Number(minutes);
+        if (!Number.isFinite(min) || min <= 0) return '';
+        if (min >= 1440) return `${(min / 1440).toFixed(1)}天`;
+        if (min >= 60) return `${(min / 60).toFixed(1)}小时`;
+        return `${Math.round(min)}分钟`;
+    }
+
+    function cycleMinutes(tl) {
+        const c = tl?.cycle_time_minutes;
+        if (c == null) return 0;
+        if (typeof c === 'object') {
+            const a = Number(c.min) || 0;
+            const b = Number(c.max) || a;
+            return (a + b) / 2;
+        }
+        return Number(c) || 0;
+    }
+
+    /** 按 predecessors 拓扑排序（并行分支按 id 稳定排序后压成一条线） */
+    function topoSortProcesses(processes) {
+        const byId = new Map(processes.map((p) => [p.id, p]));
+        const done = new Set();
+        const out = [];
+
+        function dfs(id) {
+            if (done.has(id)) return;
+            const p = byId.get(id);
+            if (!p) throw new Error(`predecessors 引用了未知工序: ${id}`);
+            (p.predecessors || []).slice().sort().forEach(dfs);
+            if (!done.has(id)) {
+                done.add(id);
+                out.push(p);
+            }
+        }
+
+        processes.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), 'zh'))
+            .forEach((p) => dfs(p.id));
+
+        if (out.length !== processes.length) {
+            throw new Error('工序 predecessors 存在环，无法拓扑排序');
+        }
+        return out;
+    }
+
+    /** 是否存在分叉（一对多）或合流（多对一） */
+    function hasBranching(rawProcesses) {
+        const childCount = new Map();
+        rawProcesses.forEach((p) => {
+            (p.predecessors || []).forEach((pred) => {
+                childCount.set(pred, (childCount.get(pred) || 0) + 1);
+            });
+        });
+        return rawProcesses.some((p) => (p.predecessors || []).length > 1)
+            || [...childCount.values()].some((c) => c > 1);
+    }
+
+    /** 从 predecessors 构建 DAG 边表（不改渲染，仅保留真实拓扑） */
+    function buildProcessGraph(rawProcesses) {
+        const edges = [];
+        rawProcesses.forEach((p) => {
+            const preds = p.predecessors || [];
+            if (!preds.length) {
+                edges.push({
+                    from: '__INBOUND__',
+                    to: p.id,
+                    wait: p.timeline?.wait_time_minutes
+                });
+            } else {
+                preds.forEach((fromId) => {
+                    edges.push({
+                        from: fromId,
+                        to: p.id,
+                        wait: p.timeline?.wait_time_minutes
+                    });
+                });
+            }
+        });
+        rawProcesses.forEach((p) => {
+            if (!edges.some((e) => e.from === p.id)) {
+                edges.push({ from: p.id, to: '__OUTBOUND__', wait: null });
+            }
+        });
+        return {
+            processIds: rawProcesses.map((p) => p.id),
+            edges
+        };
+    }
+
+    /** 人类可读的 DAG 描述，如 P01→P02/P03→P04 */
+    function describeGraphStructure(rawProcesses) {
+        const predsOf = (id) => rawProcesses.filter((p) => p.id === id)[0]?.predecessors || [];
+        const succsOf = (id) => rawProcesses
+            .filter((p) => (p.predecessors || []).includes(id))
+            .map((p) => p.id)
+            .sort((a, b) => String(a).localeCompare(String(b), 'zh'));
+
+        const roots = rawProcesses
+            .filter((p) => !(p.predecessors || []).length)
+            .map((p) => p.id)
+            .sort((a, b) => String(a).localeCompare(String(b), 'zh'));
+
+        function walk(id, stack) {
+            if (stack.has(id)) return id;
+            const succs = succsOf(id);
+            if (!succs.length) return id;
+            if (succs.length === 1) return `${id} → ${walk(succs[0], new Set([...stack, id]))}`;
+            const branches = succs.map((s) => walk(s, new Set([...stack, id]))).join(' / ');
+            const mergeTargets = [...new Set(succs.flatMap((s) => succsOf(s)))];
+            if (mergeTargets.length === 1 && predsOf(mergeTargets[0]).length > 1) {
+                return `${id} → (${branches}) → ${walk(mergeTargets[0], new Set([...stack, id, ...succs]))}`;
+            }
+            return `${id} → (${branches})`;
+        }
+
+        if (!roots.length) return rawProcesses.map((p) => p.id).join(' → ');
+        return roots.map((r) => walk(r, new Set())).join('；');
+    }
+
+    /** 关键路径：合流场景下用于提前期汇总，避免并行分支时间被重复相加 */
+    function pickCriticalPath(graph, rawProcesses) {
+        const byId = new Map(rawProcesses.map((p) => [p.id, p]));
+        const nodeWeight = (id) => {
+            if (id === '__INBOUND__' || id === '__OUTBOUND__') return 0;
+            const p = byId.get(id);
+            return (Number(p?.timeline?.wait_time_minutes) || 0) + cycleMinutes(p?.timeline);
+        };
+        const memo = new Map();
+        function longestFrom(node) {
+            if (memo.has(node)) return memo.get(node);
+            const outs = graph.edges.filter((e) => e.from === node);
+            if (!outs.length) {
+                const result = { path: [node], time: nodeWeight(node) };
+                memo.set(node, result);
+                return result;
+            }
+            let best = null;
+            outs.forEach((e) => {
+                const sub = longestFrom(e.to);
+                const time = nodeWeight(node) + sub.time;
+                if (!best || time > best.time) best = { path: [node, ...sub.path], time };
+            });
+            memo.set(node, best);
+            return best;
+        }
+        return longestFrom('__INBOUND__').path;
+    }
+
+    function computePathTimes(path, rawProcesses) {
+        const byId = new Map(rawProcesses.map((p) => [p.id, p]));
+        let totalWaitMin = 0;
+        let totalCycleMin = 0;
+        path.forEach((id) => {
+            if (id === '__INBOUND__' || id === '__OUTBOUND__') return;
+            const p = byId.get(id);
+            totalWaitMin += Number(p?.timeline?.wait_time_minutes) || 0;
+            totalCycleMin += cycleMinutes(p?.timeline);
+        });
+        return { totalWaitMin, totalCycleMin };
+    }
+
+    function processXLeft(rank) {
+        return LAYOUT.truck + (rank - 1) * (LAYOUT.link + LAYOUT.process) + LAYOUT.link;
+    }
+
+    function graphTotalWidth(maxRank) {
+        return LAYOUT.truck + maxRank * (LAYOUT.link + LAYOUT.process) + LAYOUT.link + LAYOUT.truck;
+    }
+
+    function flowYForLane(laneIndex, laneCount, maxLanes) {
+        if (laneCount === 1) {
+            return GRAPH_LAYOUT.paddingTop + (maxLanes * GRAPH_LAYOUT.laneH) / 2;
+        }
+        const span = (laneCount - 1) * GRAPH_LAYOUT.laneH;
+        const base = GRAPH_LAYOUT.paddingTop + (maxLanes * GRAPH_LAYOUT.laneH - span) / 2;
+        return base + laneIndex * GRAPH_LAYOUT.laneH;
+    }
+
+    /**
+     * 步骤 2：按列(rank) + 泳道(lane) 计算各节点像素坐标。
+     * 列 = 拓扑层级；同列多节点各占一泳道；合流节点 y 取前驱均值。
+     */
+    function layoutProcessGraph(graph) {
+        const ranks = new Map();
+        function rank(id) {
+            if (id === '__INBOUND__') return 0;
+            if (ranks.has(id)) return ranks.get(id);
+            const preds = graph.edges.filter((e) => e.to === id).map((e) => e.from);
+            const r = preds.length ? Math.max(...preds.map(rank)) + 1 : 1;
+            ranks.set(id, r);
+            return r;
+        }
+        graph.processIds.forEach((id) => rank(id));
+
+        const byRank = {};
+        graph.processIds.forEach((id) => {
+            const r = ranks.get(id);
+            (byRank[r] = byRank[r] || []).push(id);
+        });
+        Object.values(byRank).forEach((arr) => arr.sort((a, b) => String(a).localeCompare(String(b), 'zh')));
+
+        const maxRank = Math.max(...graph.processIds.map((id) => ranks.get(id)));
+        const maxLanes = Math.max(...Object.values(byRank).map((a) => a.length), 1);
+        const totalW = graphTotalWidth(maxRank);
+        const totalH = GRAPH_LAYOUT.paddingTop + maxLanes * GRAPH_LAYOUT.laneH + 100;
+        const layout = {};
+
+        Object.entries(byRank).forEach(([rStr, ids]) => {
+            const r = +rStr;
+            const n = ids.length;
+            ids.forEach((id, i) => {
+                const xLeft = processXLeft(r);
+                layout[id] = {
+                    rank: r,
+                    laneIndex: i,
+                    laneCount: n,
+                    xLeft,
+                    xCenter: xLeft + LAYOUT.process / 2,
+                    xRight: xLeft + LAYOUT.process,
+                    yFlow: flowYForLane(i, n, maxLanes)
+                };
+            });
+        });
+
+        graph.processIds.forEach((id) => {
+            const preds = graph.edges
+                .filter((e) => e.to === id && e.from !== '__INBOUND__')
+                .map((e) => e.from);
+            if (preds.length > 1) {
+                const ys = preds.map((p) => layout[p].yFlow);
+                layout[id].yFlow = (Math.min(...ys) + Math.max(...ys)) / 2;
+                layout[id].merged = true;
+            }
+        });
+
+        layout.__INBOUND__ = {
+            rank: 0,
+            laneIndex: 0,
+            xLeft: 0,
+            xCenter: LAYOUT.truck / 2,
+            xRight: LAYOUT.truck,
+            yFlow: flowYForLane(0, 1, maxLanes)
+        };
+        layout.__OUTBOUND__ = {
+            rank: maxRank + 1,
+            laneIndex: 0,
+            xLeft: totalW - LAYOUT.truck,
+            xCenter: totalW - LAYOUT.truck / 2,
+            xRight: totalW,
+            yFlow: layout.__INBOUND__.yFlow
+        };
+
+        return { layout, totalW, totalH, maxRank, maxLanes, ranks };
+    }
+
+    /** 布局摘要，供黄条验证（步骤 2 不改画面） */
+    function describeLayoutSummary(graphLayout) {
+        const { layout, totalW, totalH, maxRank, maxLanes } = graphLayout;
+        const nodes = graphLayout.graph?.processIds || Object.keys(layout).filter((k) => !k.startsWith('__'));
+        const parts = (Array.isArray(nodes) ? nodes : []).map((id) => {
+            const pos = layout[id];
+            if (!pos) return id;
+            const mergeTag = pos.merged ? '合流' : '';
+            return `${id}[列${pos.rank}/泳道${pos.laneIndex}${mergeTag} @${Math.round(pos.xCenter)},${Math.round(pos.yFlow)}]`;
+        });
+        return `画布 ${totalW}×${totalH}px · ${maxRank}列${maxLanes}泳道 · ${parts.join(' ')}`;
+    }
+
+    function convertMacroProcess(p, nextRaw) {
+        const tl = p.timeline || {};
+        const ie = p.ie_data || {};
+        const cycleStr = minutesToDuration(tl.cycle_time_minutes);
+        const waitAfter = nextRaw
+            ? minutesToDuration(nextRaw.timeline?.wait_time_minutes)
+            : '';
+
+        const data = {
+            'C/T': cycleStr || '—',
+            'C/O': minutesToDuration(tl.setup_time_minutes) || '0'
+        };
+        if (ie.availability_rate != null) {
+            data['稼动率'] = `${Math.round(Number(ie.availability_rate) * 100)}%`;
+        }
+        if (ie.performance_rate != null) {
+            data['性能率'] = `${Math.round(Number(ie.performance_rate) * 100)}%`;
+        }
+        if (ie.quality_yield != null) {
+            data['一次合格率'] = `${Math.round(Number(ie.quality_yield) * 100)}%`;
+        }
+        if (ie.availability_rate != null && ie.quality_yield != null) {
+            const a = Number(ie.availability_rate);
+            const q = Number(ie.quality_yield);
+            const perf = ie.performance_rate != null ? Number(ie.performance_rate) : 1;
+            if (Number.isFinite(a) && Number.isFinite(q) && Number.isFinite(perf)) {
+                data['OEE'] = `${Math.round(a * perf * q * 100)}%`;
+            }
+        }
+        if (p.resources?.length) data['资源'] = p.resources.join('、');
+        if (p.uaf_mapping?.operational_activity) {
+            data['UAF活动'] = p.uaf_mapping.operational_activity;
+        }
+        if (p.is_bottleneck && p.bottleneck_reason) {
+            data['瓶颈说明'] = p.bottleneck_reason;
+        }
+
+        let name = p.name || p.id;
+        if (p.is_bottleneck && !name.includes('瓶颈')) name += '【瓶颈】';
+
+        return {
+            id: p.id,
+            name,
+            operators: ie.operators ?? 1,
+            timeline: { wait: waitAfter, cycle: cycleStr },
+            next_link: { type: 'inventory', quantity: 'I' },
+            data,
+            is_bottleneck: !!p.is_bottleneck
+        };
+    }
+
+    function normalizeInput(raw) {
+        if (!isMacroFormat(raw)) {
+            const data = { ...raw };
+            const flows = collectFlows(raw);
+            if (flows.length) data.flows = flows;
+            return { data, warnings: [] };
+        }
+
+        const ent = raw.macro_entities || {};
+        const rawProcesses = raw.processes || [];
+        const sorted = topoSortProcesses(rawProcesses);
+        const warnings = [];
+
+        const branching = hasBranching(rawProcesses);
+        const graph = buildProcessGraph(rawProcesses);
+        const graphDesc = branching ? describeGraphStructure(rawProcesses) : '';
+        const criticalPath = branching ? pickCriticalPath(graph, rawProcesses) : null;
+        const graphLayout = branching ? layoutProcessGraph(graph) : null;
+        if (graphLayout) graphLayout.graph = graph;
+
+        const processes = sorted.map((p, i) => convertMacroProcess(p, sorted[i + 1]));
+        if (processes.length) delete processes[processes.length - 1].next_link;
+        const processById = Object.fromEntries(processes.map((p) => [p.id, p]));
+
+        const flows = collectFlows(raw);
+
+        let totalWaitMin;
+        let totalCycleMin;
+        if (branching && criticalPath) {
+            ({ totalWaitMin, totalCycleMin } = computePathTimes(criticalPath, rawProcesses));
+        } else {
+            const firstWaitMin = Number(sorted[0]?.timeline?.wait_time_minutes) || 0;
+            totalWaitMin = firstWaitMin;
+            totalCycleMin = 0;
+            sorted.forEach((p, i) => {
+                if (i > 0) totalWaitMin += Number(p.timeline?.wait_time_minutes) || 0;
+                totalCycleMin += cycleMinutes(p.timeline);
+            });
+        }
+        const totalMin = totalWaitMin + totalCycleMin;
+        const firstWaitMin = Number(
+            rawProcesses.find((p) => !(p.predecessors || []).length)?.timeline?.wait_time_minutes
+            ?? sorted[0]?.timeline?.wait_time_minutes
+        ) || 0;
+
+        const data = {
+            supplier: ent.supplier || { name: '供应商' },
+            customer: ent.customer || { name: '客户' },
+            production_control: ent.production_control || { name: '生产计划部' },
+            inbound: raw.inbound || {
+                label: '原材料入库',
+                wait: minutesToDuration(firstWaitMin) || ''
+            },
+            outbound: raw.outbound || { label: '成品发运' },
+            first_inventory: raw.first_inventory || { type: 'inventory', quantity: 'I' },
+            processes,
+            processById,
+            graph,
+            hasBranching: branching,
+            graphDesc,
+            graphLayout,
+            criticalPath,
+            flows,
+            // Always recompute: PLT = Σ等待 + ΣC/T（inbound 与首工序等待同源时不重复加）
+            timeline_summary: {
+                production_lead_time: minutesToLeadTimeLabel(totalMin),
+                processing_time: minutesToLeadTimeLabel(totalCycleMin),
+                value_added_ratio: totalMin > 0
+                    ? `${(totalCycleMin / totalMin * 100).toFixed(1)}%`
+                    : ''
+            }
+        };
+
+        return { data, warnings };
+    }
+
+    /* ========== 渲染引擎（与原版一致，略作瓶颈高亮） ========== */
+
+    const SVG = {
+        externalEntity: (role) => {
+            const mark = role === 'customer'
+                ? '<text x="50" y="52" font-size="14" font-weight="bold" text-anchor="middle" fill="#000">C</text>'
+                : '';
+            return `<svg width="80" height="52" viewBox="0 0 100 70" aria-label="外部对象">
+                <path d="M 8,32 L 18,22 L 28,32 L 38,22 L 48,32 L 58,22 L 68,32 L 92,32 L 92,66 L 8,66 Z"
+                    fill="#fff" stroke="#000" stroke-width="2.5" stroke-linejoin="miter" stroke-linecap="square"/>
+                ${mark}
+            </svg>`;
+        },
+        supplier: () => SVG.externalEntity('supplier'),
+        customer: () => SVG.externalEntity('customer'),
+        inventory: (qty, uid) => `<svg width="40" height="34" viewBox="0 0 100 86">
+            <polygon points="50,2 98,84 2,84" fill="#fff59d" stroke="#000" stroke-width="3"/>
+            <text x="50" y="${qty ? 58 : 54}" font-size="${qty ? 18 : 30}" font-weight="bold" text-anchor="middle">${esc(qty || 'I')}</text>
+        </svg>`,
+        materialArrow: (uid) => `<svg width="100%" height="16" viewBox="0 0 100 16" preserveAspectRatio="none">
+            <defs><pattern id="bp${uid}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="3" height="6" fill="#fff"/><rect x="3" width="3" height="6" fill="#1565c0"/>
+            </pattern></defs>
+            <polygon points="0,3 84,3 84,0 100,8 84,16 84,13 0,13" fill="url(#bp${uid})" stroke="#0d47a1" stroke-width="1"/>
+        </svg>`,
+        truck: () => `<svg width="56" height="30" viewBox="0 0 100 50">
+            <rect x="4" y="12" width="52" height="26" fill="#fff" stroke="#000" stroke-width="2"/>
+            <rect x="58" y="18" width="32" height="20" fill="#fff" stroke="#000" stroke-width="2"/>
+            <circle cx="20" cy="40" r="7" fill="#fff" stroke="#000" stroke-width="2"/>
+            <circle cx="72" cy="40" r="7" fill="#fff" stroke="#000" stroke-width="2"/>
+        </svg>`,
+        operator: () => `<svg width="18" height="18" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" fill="#fff" stroke="#000" stroke-width="1.5"/>
+            <path d="M8 16 Q12 8 16 16" fill="none" stroke="#000" stroke-width="1.2"/>
+        </svg>`,
+        fifo: () => `<svg width="40" height="34" viewBox="0 0 100 70">
+            <rect x="6" y="14" width="88" height="48" fill="none" stroke="#000" stroke-width="2"/>
+            <line x1="6" y1="36" x2="94" y2="36" stroke="#000" stroke-dasharray="4,3"/>
+            <text x="50" y="30" font-size="12" font-weight="bold" text-anchor="middle">FIFO</text>
+        </svg>`
+    };
+
+    const DEFAULT_DATA = {
+        macro_entities: {
+            supplier: { name: "原材料供应商" },
+            customer: { name: "某汽轮机厂" },
+            production_control: { name: "生产计划部" }
+        },
+        macro_flows: [
+            { from: "customer", to: "production_control", type: "electronic_info", content: "月度订单" },
+            { from: "production_control", to: "supplier", type: "electronic_info", content: "采购计划" }
+        ],
+        processes: [
+            {
+                id: "P01",
+                name: "进场检验与超探",
+                resources: ["检验科"],
+                predecessors: [],
+                timeline: { wait_time_minutes: 2880, setup_time_minutes: 60, cycle_time_minutes: 240 },
+                ie_data: { operators: 1, availability_rate: 0.85, quality_yield: 0.99 },
+                is_bottleneck: false,
+                uaf_mapping: { operational_activity: "Inspection and Ultrasonic Testing", resource: "Inspection Department" }
+            },
+            {
+                id: "P02",
+                name: "基准建立与粗车外形",
+                resources: ["数控车床"],
+                predecessors: ["P01"],
+                timeline: { wait_time_minutes: 0, setup_time_minutes: 60, cycle_time_minutes: { min: 960, max: 1080 } },
+                ie_data: { operators: 1, availability_rate: 1.0, quality_yield: 0.99 },
+                is_bottleneck: false,
+                uaf_mapping: { operational_activity: "Rough Turning", resource: "CNC Lathe" }
+            },
+            {
+                id: "P03",
+                name: "叶根槽与锥度加工",
+                resources: ["五轴加工中心"],
+                predecessors: ["P01"],
+                timeline: { wait_time_minutes: 0, setup_time_minutes: 0, cycle_time_minutes: 2880 },
+                ie_data: { operators: 1, availability_rate: 1.0, quality_yield: 1.0 },
+                is_bottleneck: false,
+                uaf_mapping: { operational_activity: "Milling and Taper Machining", resource: "5-Axis CNC Machining Center" }
+            },
+            {
+                id: "P04",
+                name: "接长轴装配与修配",
+                resources: ["钳工台"],
+                predecessors: ["P02", "P03"],
+                timeline: { wait_time_minutes: 4320, setup_time_minutes: 30, cycle_time_minutes: { min: 360, max: 400 } },
+                ie_data: { operators: 1, availability_rate: 1.0, quality_yield: 1.0 },
+                is_bottleneck: true,
+                bottleneck_reason: "合流装配节点且受限于前方主辅线的最长完工时间，自身耗时波动易导致在制品积压",
+                uaf_mapping: { operational_activity: "Rotor and Shaft Assembly", resource: "Fitter Bench" }
+            }
+        ]
+    };
+
+    /* ========== Excel 导入 / 模板 ========== */
+
+    const EXCEL_SHEETS = {
+        readme: ['说明', 'readme', 'help'],
+        entities: ['外部实体', '实体', 'entities', 'macro_entities'],
+        processes: ['工序', 'processes', 'process'],
+        flows: ['信息流', 'flows', 'macro_flows']
+    };
+
+    const ENTITY_KEYS = {
+        supplier_name: ['supplier_name', '供应商名称', '供应商'],
+        customer_name: ['customer_name', '客户名称', '客户'],
+        production_control_name: ['production_control_name', '计划部门名称', '生产计划部', '计划部门', 'production_control'],
+        inbound_label: ['inbound_label', '入库标签', '入库'],
+        inbound_wait_minutes: ['inbound_wait_minutes', '首工序等待_分钟', '入库等待_分钟', '首库等待_分钟'],
+        outbound_label: ['outbound_label', '出库标签', '出库']
+    };
+
+    const PROCESS_COLS = {
+        id: ['工序id', '工序ID', 'id', 'ID', '编号'],
+        name: ['工序名称', 'name', '名称'],
+        predecessors: ['前序工序', 'predecessors', '前置工序', '前序'],
+        resources: ['资源', 'resources', '设备资源'],
+        wait: ['等待_分钟', '等待时间_分钟', 'wait_time_minutes', 'wait', '等待'],
+        setup: ['换型_分钟', 'setup_time_minutes', 'setup', '换型', 'C/O_分钟'],
+        cycle: ['加工_分钟', 'cycle_time_minutes', 'cycle', '加工时间_分钟', '加工', 'C/T_分钟'],
+        cycle_max: ['加工_分钟_最大', 'cycle_max', '加工最大_分钟', 'cycle_time_max'],
+        operators: ['人数', 'operators', '操作人数'],
+        availability: ['稼动率', 'availability_rate', '可用率'],
+        performance: ['性能率', 'performance_rate', '速度开动率'],
+        yield: ['合格率', 'quality_yield', '一次合格率', '良率'],
+        bottleneck: ['瓶颈', 'is_bottleneck', '是否瓶颈'],
+        bottleneck_reason: ['瓶颈说明', 'bottleneck_reason']
+    };
+
+    const FLOW_COLS = {
+        from: ['起点', 'from', '从', '来源'],
+        to: ['终点', 'to', '到', '目标'],
+        type: ['类型', 'type', '流类型'],
+        content: ['内容', 'content', '信息内容', '说明']
+    };
+
+    function normHeader(h) {
+        return String(h ?? '').trim().toLowerCase().replace(/\s+/g, '');
+    }
+
+    function findSheet(workbook, aliases) {
+        const names = workbook.SheetNames || [];
+        for (const alias of aliases) {
+            const hit = names.find((n) => normHeader(n) === normHeader(alias));
+            if (hit) return workbook.Sheets[hit];
+        }
+        return null;
+    }
+
+    function sheetRows(sheet) {
+        if (!sheet) return [];
+        return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+    }
+
+    function rowToMap(headers, row) {
+        const map = {};
+        headers.forEach((h, i) => {
+            const key = String(h ?? '').trim();
+            if (!key) return;
+            map[key] = row[i] ?? '';
+        });
+        return map;
+    }
+
+    function pickField(map, aliases) {
+        const keys = Object.keys(map);
+        for (const alias of aliases) {
+            const na = normHeader(alias);
+            const hit = keys.find((k) => normHeader(k) === na);
+            if (hit != null && String(map[hit]).trim() !== '') return String(map[hit]).trim();
+        }
+        return '';
+    }
+
+    function parseBool(val) {
+        const s = String(val ?? '').trim().toLowerCase();
+        return ['1', 'true', 'yes', 'y', '是', '√', '瓶颈'].includes(s);
+    }
+
+    function parseList(val) {
+        const s = String(val ?? '').trim();
+        if (!s) return [];
+        return s.split(/[,，;；|/\s]+/).map((x) => x.trim()).filter(Boolean);
+    }
+
+    /** 将单元格值解析为分钟：支持纯数字、2d、4h、30min、960~1080 */
+    function parseMinutesCell(val) {
+        const s = String(val ?? '').trim();
+        if (!s) return null;
+        if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+
+        const range = s.match(/^(.+?)\s*[~～\-—]\s*(.+)$/);
+        if (range) {
+            const a = parseSingleDuration(range[1]);
+            const b = parseSingleDuration(range[2]);
+            if (a != null && b != null) return { min: Math.min(a, b), max: Math.max(a, b) };
+        }
+        return parseSingleDuration(s);
+    }
+
+    function parseSingleDuration(s) {
+        const t = String(s).trim().toLowerCase();
+        if (!t) return null;
+        if (/^\d+(\.\d+)?$/.test(t)) return Number(t);
+        const m = t.match(/^(\d+(?:\.\d+)?)\s*(d|day|days|天|h|hr|hour|hours|小时|min|mins|minute|minutes|分|分钟|m)?$/i);
+        if (!m) return Number(t) || null;
+        const n = Number(m[1]);
+        const u = (m[2] || 'min').toLowerCase();
+        if (u === 'd' || u === 'day' || u === 'days' || u === '天') return n * 1440;
+        if (u === 'h' || u === 'hr' || u === 'hour' || u === 'hours' || u === '小时') return n * 60;
+        return n;
+    }
+
+    function parseRate(val) {
+        const s = String(val ?? '').trim();
+        if (!s) return undefined;
+        if (s.endsWith('%')) return Math.min(1, Number(s.slice(0, -1)) / 100);
+        const n = Number(s);
+        if (!Number.isFinite(n)) return undefined;
+        return n > 1 ? n / 100 : n;
+    }
+
+    function parseEntitiesSheet(sheet) {
+        const rows = sheetRows(sheet);
+        if (!rows.length) return {};
+        const out = {};
+        const h0 = String(rows[0][0] ?? '').trim();
+        const isKv = ['配置项', '字段', '键', 'key', 'config'].some((k) => normHeader(h0) === normHeader(k));
+
+        if (isKv && rows.length > 1) {
+            rows.slice(1).forEach((row) => {
+                const k = String(row[0] ?? '').trim();
+                const v = row[1];
+                if (!k) return;
+                out[k] = v;
+            });
+        } else {
+            const headers = rows[0].map((h) => String(h ?? '').trim());
+            const dataRow = rows[1] || [];
+            const map = rowToMap(headers, dataRow);
+            Object.values(ENTITY_KEYS).flat().forEach((alias) => {
+                const v = pickField(map, [alias]);
+                if (v) out[alias] = v;
+            });
+            headers.forEach((h, i) => {
+                if (h && dataRow[i] != null && String(dataRow[i]).trim() !== '') out[h] = dataRow[i];
+            });
+        }
+
+        const get = (...aliases) => {
+            for (const a of aliases) {
+                const hit = Object.keys(out).find((k) => normHeader(k) === normHeader(a));
+                if (hit != null && String(out[hit]).trim() !== '') return String(out[hit]).trim();
+            }
+            return '';
+        };
+
+        return {
+            supplier_name: get('supplier_name', '供应商名称', '供应商') || '供应商',
+            customer_name: get('customer_name', '客户名称', '客户') || '客户',
+            production_control_name: get('production_control_name', '计划部门名称', '生产计划部', '计划部门') || '生产计划部',
+            inbound_label: get('inbound_label', '入库标签', '入库') || '原材料入库',
+            inbound_wait_minutes: parseMinutesCell(get('inbound_wait_minutes', '首工序等待_分钟', '入库等待_分钟', '首库等待_分钟')),
+            outbound_label: get('outbound_label', '出库标签', '出库') || '成品发运'
+        };
+    }
+
+    function parseProcessesSheet(sheet) {
+        const rows = sheetRows(sheet).filter((r) => r.some((c) => String(c ?? '').trim() !== ''));
+        if (rows.length < 2) throw new Error('「工序」工作表至少需要表头行和一行数据');
+
+        const headers = rows[0].map((h) => String(h ?? '').trim());
+        const processes = [];
+
+        rows.slice(1).forEach((row, idx) => {
+            const map = rowToMap(headers, row);
+            const id = pickField(map, PROCESS_COLS.id);
+            const name = pickField(map, PROCESS_COLS.name);
+            if (!id && !name) return;
+            if (!id) throw new Error(`工序表第 ${idx + 2} 行缺少工序 ID`);
+            if (!name) throw new Error(`工序 ${id} 缺少工序名称`);
+
+            const wait = parseMinutesCell(pickField(map, PROCESS_COLS.wait));
+            const setup = parseMinutesCell(pickField(map, PROCESS_COLS.setup));
+            let cycle = parseMinutesCell(pickField(map, PROCESS_COLS.cycle));
+            const cycleMaxRaw = pickField(map, PROCESS_COLS.cycle_max);
+            if (cycleMaxRaw) {
+                const cMax = parseMinutesCell(cycleMaxRaw);
+                const cMin = typeof cycle === 'number' ? cycle : (cycle?.min ?? 0);
+                const cMaxN = typeof cMax === 'number' ? cMax : (cMax?.max ?? cMax?.min);
+                if (cMaxN != null && cMin != null && cMaxN !== cMin) cycle = { min: cMin, max: cMaxN };
+            }
+
+            const timeline = {};
+            if (wait != null) timeline.wait_time_minutes = wait;
+            if (setup != null) timeline.setup_time_minutes = setup;
+            if (cycle != null) timeline.cycle_time_minutes = cycle;
+
+            const resources = parseList(pickField(map, PROCESS_COLS.resources));
+            const operators = pickField(map, PROCESS_COLS.operators);
+            const availability = pickField(map, PROCESS_COLS.availability);
+            const performance = pickField(map, PROCESS_COLS.performance);
+            const yld = pickField(map, PROCESS_COLS.yield);
+            const ie = {};
+            if (operators) ie.operators = Number(operators) || 1;
+            const ar = parseRate(availability);
+            if (ar != null) ie.availability_rate = ar;
+            const pr = parseRate(performance);
+            if (pr != null) ie.performance_rate = pr;
+            const qr = parseRate(yld);
+            if (qr != null) ie.quality_yield = qr;
+
+            const proc = {
+                id,
+                name,
+                predecessors: parseList(pickField(map, PROCESS_COLS.predecessors)),
+                timeline,
+                ie_data: ie
+            };
+            if (resources.length) proc.resources = resources;
+            if (parseBool(pickField(map, PROCESS_COLS.bottleneck))) {
+                proc.is_bottleneck = true;
+                const reason = pickField(map, PROCESS_COLS.bottleneck_reason);
+                if (reason) proc.bottleneck_reason = reason;
+            }
+            processes.push(proc);
+        });
+
+        if (!processes.length) throw new Error('「工序」工作表未解析到有效工序行');
+        return processes;
+    }
+
+    function parseFlowsSheet(sheet) {
+        const rows = sheetRows(sheet).filter((r) => r.some((c) => String(c ?? '').trim() !== ''));
+        if (rows.length < 2) return [];
+        const headers = rows[0].map((h) => String(h ?? '').trim());
+        const flows = [];
+
+        rows.slice(1).forEach((row) => {
+            const map = rowToMap(headers, row);
+            const from = pickField(map, FLOW_COLS.from);
+            const to = pickField(map, FLOW_COLS.to);
+            if (!from || !to) return;
+            flows.push({
+                from,
+                to,
+                type: pickField(map, FLOW_COLS.type) || 'electronic_info',
+                content: pickField(map, FLOW_COLS.content) || undefined
+            });
+        });
+        return flows;
+    }
+
+    function excelWorkbookToMacroJson(workbook) {
+        const procSheet = findSheet(workbook, EXCEL_SHEETS.processes);
+        if (!procSheet) throw new Error('未找到「工序」工作表（也接受 processes 命名）');
+
+        const entSheet = findSheet(workbook, EXCEL_SHEETS.entities);
+        const flowSheet = findSheet(workbook, EXCEL_SHEETS.flows);
+        const ent = entSheet ? parseEntitiesSheet(entSheet) : parseEntitiesSheet(null);
+        const processes = parseProcessesSheet(procSheet);
+        const macro_flows = flowSheet ? parseFlowsSheet(flowSheet) : [];
+
+        const raw = {
+            macro_entities: {
+                supplier: { name: ent.supplier_name },
+                customer: { name: ent.customer_name },
+                production_control: { name: ent.production_control_name }
+            },
+            macro_flows,
+            processes
+        };
+
+        if (ent.inbound_label || ent.inbound_wait_minutes != null) {
+            raw.inbound = { label: ent.inbound_label };
+            if (ent.inbound_wait_minutes != null) {
+                const w = ent.inbound_wait_minutes;
+                const min = typeof w === 'object' ? w.min : w;
+                raw.inbound.wait = minutesToDuration(min);
+            }
+        }
+        if (ent.outbound_label) raw.outbound = { label: ent.outbound_label };
+
+        return raw;
+    }
+
+    function getInboundWaitMinutes(d) {
+        if (d.inbound?.wait_time_minutes != null) return d.inbound.wait_time_minutes;
+        if (d.inbound?.wait) {
+            const parsed = parseMinutesCell(d.inbound.wait);
+            if (parsed != null) return typeof parsed === 'object' ? parsed.min : parsed;
+        }
+        const root = (d.processes || []).find((p) => !(p.predecessors || []).length);
+        return root?.timeline?.wait_time_minutes ?? '';
+    }
+
+    /** 由 Macro JSON 构建 Excel 工作簿（与导入模板结构一致，可双向转换） */
+    function buildWorkbookFromMacroJson(d, { source = 'template' } = {}) {
+        const ent = d.macro_entities || {};
+        const wb = XLSX.utils.book_new();
+        const srcLabel = source === 'natural_language' ? '自然语言 AI 生成' : '内置模板';
+
+        const readme = [
+            ['VSM Macro Excel'],
+            ['来源', srcLabel],
+            [''],
+            ['工作表', '用途'],
+            ['外部实体', '供应商 / 客户 / 计划部门 / 入库出库'],
+            ['工序', '工序列表；前序多个用英文逗号，如 P02,P03'],
+            ['信息流', '起点/终点：customer、production_control、supplier'],
+            [''],
+            ['说明', '本文件可由 JSON 导出，也可导入工具还原为 JSON 并渲染']
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(readme), '说明');
+
+        const entities = [
+            ['配置项', '值', '说明'],
+            ['supplier_name', ent.supplier?.name || '供应商', '供应商名称'],
+            ['customer_name', ent.customer?.name || '客户', '客户名称'],
+            ['production_control_name', ent.production_control?.name || '生产计划部', '计划部门名称'],
+            ['inbound_label', d.inbound?.label || '原材料入库', '物料流左侧入库标签'],
+            ['inbound_wait_minutes', getInboundWaitMinutes(d), '首工序前等待（分钟）'],
+            ['outbound_label', d.outbound?.label || '成品发运', '物料流右侧出库标签']
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(entities), '外部实体');
+
+        const procHeader = [
+            '工序ID', '工序名称', '前序工序', '资源', '等待_分钟', '换型_分钟',
+            '加工_分钟', '加工_分钟_最大', '人数', '稼动率', '性能率', '合格率', 'OEE', '瓶颈', '瓶颈说明'
+        ];
+        const procRows = [procHeader];
+        (d.processes || []).forEach((p) => {
+            const tl = p.timeline || {};
+            const ie = p.ie_data || {};
+            const cycle = tl.cycle_time_minutes;
+            let cycleMin = '';
+            let cycleMax = '';
+            if (cycle && typeof cycle === 'object') {
+                cycleMin = cycle.min ?? '';
+                cycleMax = cycle.max ?? '';
+            } else if (cycle != null) {
+                cycleMin = cycle;
+            }
+            const a = ie.availability_rate != null ? Number(ie.availability_rate) : null;
+            const perf = ie.performance_rate != null ? Number(ie.performance_rate) : 1;
+            const q = ie.quality_yield != null ? Number(ie.quality_yield) : null;
+            const oee = (a != null && q != null && Number.isFinite(a) && Number.isFinite(q) && Number.isFinite(perf))
+                ? a * perf * q
+                : '';
+            procRows.push([
+                p.id,
+                p.name,
+                (p.predecessors || []).join(','),
+                (p.resources || []).join(','),
+                tl.wait_time_minutes ?? '',
+                tl.setup_time_minutes ?? '',
+                cycleMin,
+                cycleMax,
+                ie.operators ?? '',
+                ie.availability_rate ?? '',
+                ie.performance_rate ?? '',
+                ie.quality_yield ?? '',
+                oee,
+                p.is_bottleneck ? '是' : '',
+                p.bottleneck_reason || ''
+            ]);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(procRows), '工序');
+
+        const flowRows = [
+            ['起点', '终点', '类型', '内容'],
+            ...(d.macro_flows || []).map((f) => [f.from, f.to, f.type || 'electronic_info', f.content || ''])
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(flowRows), '信息流');
+
+        return wb;
+    }
+
+    function downloadExcelFromMacroJson(data, filename, { source } = {}) {
+        if (typeof XLSX === 'undefined') {
+            alert('SheetJS 未加载，请检查网络后刷新页面');
+            return null;
+        }
+        const name = filename || 'VSM_Macro.xlsx';
+        const wb = buildWorkbookFromMacroJson(data, {
+            source: source || (name.includes('自然语言') ? 'natural_language' : 'export')
+        });
+        XLSX.writeFile(wb, name);
+        return name;
+    }
+
+    function downloadCurrentJsonAsExcel() {
+        try {
+            const raw = JSON.parse(document.getElementById('json-input').value);
+            if (!raw.processes?.length) throw new Error('当前 JSON 无有效工序');
+            const fname = downloadExcelFromMacroJson(raw, 'VSM_当前数据.xlsx');
+            showExcelStatus(`已从 JSON 导出：${fname}`);
+        } catch (e) {
+            document.getElementById('error').textContent = `导出 Excel 失败：${e.message}`;
+            document.getElementById('error').style.display = 'block';
+        }
+    }
+
+    function buildTemplateWorkbook() {
+        return buildWorkbookFromMacroJson(DEFAULT_DATA, { source: 'template' });
+    }
+
+    function downloadExcelTemplate() {
+        if (typeof XLSX === 'undefined') {
+            alert('SheetJS 未加载，请检查网络后刷新页面');
+            return;
+        }
+        const wb = buildTemplateWorkbook();
+        XLSX.writeFile(wb, 'VSM_Macro_模板.xlsx');
+        showExcelStatus('已下载模板：VSM_Macro_模板.xlsx');
+    }
+
+    function showExcelStatus(_msg) { /* 内部状态提示已关闭，避免干扰界面 */ }
+
+    function importExcelFile(file) {
+        const input = document.getElementById('excel-file');
+        if (!file) return;
+        if (typeof XLSX === 'undefined') {
+            alert('SheetJS 未加载，请检查网络后刷新页面');
+            if (input) input.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                const macroJson = excelWorkbookToMacroJson(wb);
+                document.getElementById('json-input').value = JSON.stringify(macroJson, null, 2);
+                showExcelStatus(`已导入：${file.name}（${macroJson.processes.length} 道工序，${(macroJson.macro_flows || []).length} 条信息流）`);
+                render();
+            } catch (err) {
+                showExcelStatus('');
+                document.getElementById('error').textContent = `Excel 导入失败：${err.message}`;
+                document.getElementById('error').style.display = 'block';
+            } finally {
+                if (input) input.value = '';
+            }
+        };
+        reader.onerror = () => {
+            showExcelStatus('');
+            document.getElementById('error').textContent = '读取 Excel 文件失败';
+            document.getElementById('error').style.display = 'block';
+            if (input) input.value = '';
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    /* ========== 自然语言 → JSON ========== */
+
+    const NL_PROVIDER_PRESETS = {
+        deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
+        openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+        custom: { baseUrl: '', model: '' }
+    };
+
+    const NL_EXAMPLE_TEXT = `某汽轮机厂叶片加工价值流，4 道工序：
+1. P01 进场检验与超探，无前置，等待 2 天，加工 4 小时，换型 1 小时，检验科，稼动率 85%，合格率 99%。
+2. P01 完成后分叉：P02 基准建立与粗车外形（数控车床，加工 16~18 小时，换型 1 小时）和 P03 叶根槽与锥度加工（五轴加工中心，加工 2 天）。
+3. P02 和 P03 都完成后合流到 P04 接长轴装配与修配（钳工台，等待 3 天，加工 6~6.7 小时，瓶颈工序）。
+供应商：原材料供应商；客户：某汽轮机厂；计划部门：生产计划部。
+信息流：客户发月度订单给计划部，计划部发采购计划给供应商。`;
+
+    let currentInputMode = 'nl';
+
+    function switchInputMode(mode) {
+        currentInputMode = mode;
+        document.getElementById('input-nl').classList.toggle('active', mode === 'nl');
+        document.getElementById('input-json').classList.toggle('active', mode === 'json');
+        document.getElementById('nl-panel').classList.toggle('active', mode === 'nl');
+        document.getElementById('json-panel').classList.toggle('active', mode === 'json');
+        saveNlSettings();
+    }
+
+    function applyNlProviderPreset() {
+        const p = NL_PROVIDER_PRESETS[document.getElementById('nl-provider').value];
+        if (!p || document.getElementById('nl-provider').value === 'custom') return;
+        document.getElementById('nl-base-url').value = p.baseUrl;
+        document.getElementById('nl-model').value = p.model;
+        saveNlSettings();
+    }
+
+    function saveNlSettings() {
+        try {
+            sessionStorage.setItem('vsm_nl_provider', document.getElementById('nl-provider').value);
+            sessionStorage.setItem('vsm_nl_model', document.getElementById('nl-model').value);
+            sessionStorage.setItem('vsm_nl_base_url', document.getElementById('nl-base-url').value);
+            const key = document.getElementById('nl-api-key').value;
+            if (key) sessionStorage.setItem('vsm_nl_api_key', key);
+        } catch (_) { /* ignore */ }
+    }
+
+    function loadNlSettings() {
+        try {
+            const provider = sessionStorage.getItem('vsm_nl_provider');
+            if (provider) document.getElementById('nl-provider').value = provider;
+            const model = sessionStorage.getItem('vsm_nl_model');
+            if (model) document.getElementById('nl-model').value = model;
+            const base = sessionStorage.getItem('vsm_nl_base_url');
+            if (base) document.getElementById('nl-base-url').value = base;
+            const key = sessionStorage.getItem('vsm_nl_api_key');
+            if (key) document.getElementById('nl-api-key').value = key;
+            else applyNlProviderPreset();
+        } catch (_) {
+            applyNlProviderPreset();
+        }
+    }
+
+    function fillNlExample() {
+        document.getElementById('nl-input').value = NL_EXAMPLE_TEXT;
+    }
+
+    function buildNlSystemPrompt() {
+        const example = JSON.stringify(DEFAULT_DATA, null, 2);
+        return `你是 VSM（价值流图）Macro JSON 生成器。根据用户的自然语言描述，输出且仅输出一个合法 JSON 对象，不要 markdown 代码块，不要解释文字。
+
+JSON 结构要求：
+{
+  "macro_entities": {
+    "supplier": { "name": "供应商名称" },
+    "customer": { "name": "客户名称" },
+    "production_control": { "name": "计划部门名称" }
+  },
+  "macro_flows": [
+    { "from": "customer|supplier|production_control", "to": "...", "type": "electronic_info", "content": "说明" }
+  ],
+  "inbound": { "label": "入库标签", "wait": "可选，如 2d" },
+  "outbound": { "label": "出库标签" },
+  "processes": [
+    {
+      "id": "P01",
+      "name": "工序名",
+      "resources": ["可选资源"],
+      "predecessors": [],
+      "timeline": {
+        "wait_time_minutes": 0,
+        "setup_time_minutes": 0,
+        "cycle_time_minutes": 60
+      },
+      "ie_data": { "operators": 1, "availability_rate": 1.0, "quality_yield": 1.0 },
+      "is_bottleneck": false,
+      "bottleneck_reason": "可选"
+    }
+  ]
+}
+
+规则：
+1. 所有时间统一用分钟数写入 timeline（1天=1440，1小时=60）；若用户说 2d 则 wait_time_minutes=2880。
+2. 加工时间区间用 cycle_time_minutes: { "min": 960, "max": 1080 }。
+3. 并行分支：多个工序 predecessors 相同；合流：某工序 predecessors 填多个 ID，用数组。
+4. 工序 id 用 P01、P02… 或用户给出的编号，保持唯一。
+5. macro_flows 的 from/to 用小写：customer、supplier、production_control。
+6. 必须至少 1 道工序；信息流至少 0 条。
+7. 只输出 JSON，可被 JSON.parse 直接解析。
+
+参考示例：
+${example}`;
+    }
+
+    function extractJsonFromModelText(text) {
+        const raw = String(text ?? '').trim();
+        if (!raw) throw new Error('模型返回为空');
+        const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        const candidate = (fenced ? fenced[1] : raw).trim();
+        const start = candidate.indexOf('{');
+        const end = candidate.lastIndexOf('}');
+        if (start < 0 || end <= start) throw new Error('未在模型回复中找到 JSON 对象');
+        return JSON.parse(candidate.slice(start, end + 1));
+    }
+
+    function validateGeneratedMacroJson(raw) {
+        if (!raw || typeof raw !== 'object') throw new Error('生成结果不是 JSON 对象');
+        if (!Array.isArray(raw.processes) || !raw.processes.length) {
+            throw new Error('生成结果缺少 processes 或工序为空');
+        }
+        raw.processes.forEach((p, i) => {
+            if (!p?.id) throw new Error(`第 ${i + 1} 道工序缺少 id`);
+            if (!p?.name) throw new Error(`工序 ${p.id} 缺少 name`);
+            if (!p.timeline) p.timeline = {};
+        });
+        if (!raw.macro_entities) {
+            raw.macro_entities = {
+                supplier: { name: '供应商' },
+                customer: { name: '客户' },
+                production_control: { name: '生产计划部' }
+            };
+        }
+        if (!raw.macro_flows) raw.macro_flows = [];
+        normalizeInput(raw);
+        return raw;
+    }
+
+    async function generateJsonFromNaturalLanguage() {
+        const btn = document.getElementById('btn-nl-generate');
+        const err = document.getElementById('error');
+        const desc = document.getElementById('nl-input').value.trim();
+        const apiKey = document.getElementById('nl-api-key').value.trim();
+        let baseUrl = document.getElementById('nl-base-url').value.trim().replace(/\/+$/, '');
+        const model = document.getElementById('nl-model').value.trim();
+
+        saveNlSettings();
+        err.style.display = 'none';
+        showExcelStatus('');
+
+        if (!desc) {
+            err.textContent = '请先输入自然语言描述';
+            err.style.display = 'block';
+            return;
+        }
+        if (!apiKey) {
+            err.textContent = '请填写 API Key（DeepSeek / OpenAI 等 OpenAI 兼容接口）';
+            err.style.display = 'block';
+            return;
+        }
+        if (!baseUrl || !model) {
+            err.textContent = '请填写 API Base URL 和模型名称';
+            err.style.display = 'block';
+            return;
+        }
+
+        const url = `${baseUrl}/chat/completions`;
+        btn.disabled = true;
+        btn.textContent = '生成中…';
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model,
+                    temperature: 0.2,
+                    messages: [
+                        { role: 'system', content: buildNlSystemPrompt() },
+                        { role: 'user', content: desc }
+                    ]
+                })
+            });
+
+            const body = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                const msg = body.error?.message || body.message || resp.statusText;
+                throw new Error(`API 请求失败 (${resp.status})：${msg}`);
+            }
+
+            const content = body.choices?.[0]?.message?.content;
+            const raw = extractJsonFromModelText(content);
+            validateGeneratedMacroJson(raw);
+
+            document.getElementById('json-input').value = JSON.stringify(raw, null, 2);
+            const excelName = downloadExcelFromMacroJson(raw, 'VSM_自然语言生成.xlsx', { source: 'natural_language' });
+            switchInputMode('json');
+            showExcelStatus(
+                `已生成：${excelName} + JSON（${raw.processes.length} 道工序，`
+                + `${(raw.macro_flows || []).length} 条信息流）· Excel 已下载，请核对 JSON 后渲染`
+            );
+            render();
+        } catch (e) {
+            err.textContent = e.message || String(e);
+            err.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '生成 Excel + JSON 并渲染';
+        }
+    }
+
+    let lastLayout = null;
+    let lastMacroRaw = null;
+    let lastMetrics = null;
+    let currentTab = 'map';
+    let metricsPanelOpen = false;
+    let metricsTab = 'overview';
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.getElementById('tab-map').classList.toggle('active', tab === 'map');
+        document.getElementById('tab-symbols').classList.toggle('active', tab === 'symbols');
+        document.getElementById('input-mode-tabs').style.display = tab === 'map' ? 'flex' : 'none';
+        document.getElementById('input-mode-body').style.display = tab === 'map' ? 'flex' : 'none';
+        if (tab === 'map') {
+            switchInputMode(currentInputMode);
+        }
+        render();
+    }
+
+    function esc(s) {
+        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function escAttr(s) {
+        return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function buildColumns(data) {
+        const cols = [];
+        const uid = Date.now();
+        const procs = data.processes || [];
+        cols.push({ type: 'truck-in', id: 'INBOUND', label: data.inbound?.label || '入库', wait: '' });
+
+        procs.forEach((p, i) => {
+            const prev = i > 0 ? procs[i - 1] : null;
+            const nl = i === 0
+                ? (data.first_inventory || p.next_link || { type: 'inventory', quantity: '1' })
+                : (prev.next_link || { type: 'inventory', quantity: '1' });
+            const invType = nl.type === 'fifo' ? 'fifo' : 'inventory';
+            const wait = i === 0
+                ? (data.inbound?.wait ?? p.timeline?.wait ?? '')
+                : (prev.timeline?.wait ?? '');
+            cols.push({
+                type: invType,
+                id: `INV-${i}`,
+                quantity: nl.quantity ?? 'I',
+                wait: String(wait)
+            });
+            cols.push({
+                type: 'process',
+                id: p.id,
+                process: p,
+                cycle: p.timeline?.cycle ?? p.data?.['C/T'] ?? ''
+            });
+        });
+
+        cols.push({ type: 'truck-out', id: 'OUTBOUND', label: data.outbound?.label || '出库' });
+        return { cols, uid };
+    }
+
+    function colWidth(col) {
+        if (col.type === 'truck-in' || col.type === 'truck-out') return LAYOUT.truck;
+        if (col.type === 'process') return LAYOUT.process;
+        return LAYOUT.link;
+    }
+
+    function colClass(col) {
+        if (col.type === 'truck-in' || col.type === 'truck-out') return 'col-truck';
+        if (col.type === 'process') return 'col-process';
+        return 'col-link';
+    }
+
+    function getLayoutAnchor(id, layout, side) {
+        const pos = layout[id];
+        if (!pos) return { x: 0, y: 0 };
+        if (side === 'right') return { x: pos.xRight, y: pos.yFlow };
+        if (side === 'left') return { x: pos.xLeft, y: pos.yFlow };
+        return { x: pos.xCenter, y: pos.yFlow };
+    }
+
+    function linkBusX(fromId, toId, layout) {
+        const a = getLayoutAnchor(fromId, layout, 'right');
+        const b = getLayoutAnchor(toId, layout, 'left');
+        return a.x + (b.x - a.x) / 2;
+    }
+
+    /** 与线性模式 .mat-inv-row 对齐：三角在 push 箭头正下方居中 */
+    const MAT_GRAPH = { arrowH: 16, invGap: 8, waitOffset: 10 };
+
+    /**
+     * 构建物料路由：水平段用标准 VSM chevron，垂直段用实线母线。
+     */
+    function buildMaterialRoutes(graph, layout) {
+        const segments = [];
+        const labels = [];
+        const forkTrunkDone = new Set();
+        const mergeTrunkDone = new Set();
+
+        function addHSeg(x1, x2, y, withHead) {
+            if (x2 - x1 < 2) return;
+            segments.push({ kind: 'h', x1, x2, y, withHead });
+        }
+
+        function addVSeg(x1, y1, x2, y2) {
+            if (Math.abs(y2 - y1) < 2) return;
+            segments.push({ kind: 'v', x1, y1, x2, y2 });
+        }
+
+        /** 在制品三角：水平居中于 push 箭头，位于箭头下缘 + invGap（同线性 VSM） */
+        function addLabelOnArrow(edge, x1, x2, y) {
+            labels.push({
+                edge,
+                x: (x1 + x2) / 2,
+                invTop: y + MAT_GRAPH.arrowH / 2 + MAT_GRAPH.invGap,
+                waitTop: y - MAT_GRAPH.arrowH / 2 - MAT_GRAPH.waitOffset
+            });
+        }
+
+        graph.edges.forEach((edge) => {
+            const { from, to } = edge;
+            const a = getLayoutAnchor(from, layout, 'right');
+            const b = getLayoutAnchor(to, layout, 'left');
+            const endX = b.x - 2;
+
+            if (to === '__OUTBOUND__') {
+                addHSeg(a.x, endX, a.y, true);
+                return;
+            }
+
+            const busX = linkBusX(from, to, layout);
+            const succs = graph.edges.filter((e) => e.from === from && e.to !== '__OUTBOUND__');
+            const preds = graph.edges.filter((e) => e.to === to && e.from !== '__INBOUND__');
+            const isFork = succs.length > 1;
+            const isMerge = preds.length > 1;
+
+            if (Math.abs(a.y - b.y) < 2 && !isFork && !isMerge) {
+                addHSeg(a.x, endX, a.y, true);
+                addLabelOnArrow(edge, a.x, endX, a.y);
+                return;
+            }
+
+            if (isFork) {
+                if (!forkTrunkDone.has(from)) {
+                    addHSeg(a.x, busX, a.y, false);
+                    forkTrunkDone.add(from);
+                }
+                if (Math.abs(a.y - b.y) >= 2) {
+                    addVSeg(busX, a.y, busX, b.y);
+                }
+                addHSeg(busX, endX, b.y, true);
+                addLabelOnArrow(edge, busX, endX, b.y);
+                return;
+            }
+
+            if (isMerge) {
+                addHSeg(a.x, busX, a.y, false);
+                if (!mergeTrunkDone.has(to)) {
+                    const predYs = preds.map((e) => getLayoutAnchor(e.from, layout, 'right').y);
+                    const vTop = Math.min(...predYs);
+                    const vBot = Math.max(...predYs, b.y);
+                    addVSeg(busX, vTop, busX, vBot);
+                    addHSeg(busX, endX, b.y, true);
+                    const labelEdge = preds.find((e) => e.wait) || preds[0];
+                    addLabelOnArrow(labelEdge, busX, endX, b.y);
+                    mergeTrunkDone.add(to);
+                }
+                return;
+            }
+
+            addHSeg(a.x, busX, a.y, false);
+            if (Math.abs(a.y - b.y) >= 2) {
+                addVSeg(busX, a.y, busX, b.y);
+            }
+            addHSeg(busX, endX, b.y, true);
+            addLabelOnArrow(edge, busX, endX, b.y);
+        });
+
+        return { segments, labels };
+    }
+
+    /** 标准 VSM 物料流 chevron（与 SVG.materialArrow 同形，可指定宽度与是否带箭头尖） */
+    function renderMaterialChevron(x1, x2, y, uid, withHead) {
+        const w = x2 - x1;
+        if (w < 2) return '';
+        const h = 16;
+        const y0 = y - h / 2;
+        const pid = `bp${uid}`;
+        const sx = w / 100;
+
+        if (!withHead) {
+            return `<rect x="${x1}" y="${y0 + 2.5}" width="${w}" height="11"
+                fill="url(#${pid})" stroke="#0d47a1" stroke-width="1"/>`;
+        }
+
+        const p = (px, py) => `${x1 + px * sx},${y0 + py}`;
+        const points = [
+            p(0, 3), p(84, 3), p(84, 0), p(100, 8), p(84, 16), p(84, 13), p(0, 13)
+        ].join(' ');
+        return `<polygon points="${points}" fill="url(#${pid})" stroke="#0d47a1" stroke-width="1"/>`;
+    }
+
+    function renderProcessNodeHtml(p) {
+        const bn = p.is_bottleneck ? ' bottleneck' : '';
+        let html = `<div class="mat-process${bn}"><span class="vsm-edit-name" data-process-id="${escAttr(p.id)}" title="点击编辑名称">${esc(p.name)}</span>`;
+        if (p.operators) html += `<span class="mat-operator">${SVG.operator()}</span>`;
+        html += '</div>';
+        if (p.data) {
+            html += '<table class="mat-data">';
+            for (const [k, v] of Object.entries(p.data)) {
+                if (k === 'OEE') {
+                    html += `<tr><td>${esc(k)}</td><td title="由稼动率×性能率×合格率计算">${esc(v)}</td></tr>`;
+                } else {
+                    html += `<tr><td>${esc(k)}</td><td class="vsm-edit-data" data-process-id="${escAttr(p.id)}" data-field="${escAttr(k)}" title="点击编辑">${esc(v)}</td></tr>`;
+                }
+            }
+            html += '</table>';
+        }
+        return html;
+    }
+
+    /** 步骤 3：分叉/合流物料流（使用 graphLayout 坐标） */
+    function renderMaterialGraph(data, graphLayout, uid) {
+        const { layout, totalW, totalH } = graphLayout;
+        const graph = data.graph;
+        const routes = buildMaterialRoutes(graph, layout);
+        let html = `<div class="mat-canvas" style="width:${totalW}px;height:${totalH}px">`;
+
+        let svgInner = `<defs>
+            <pattern id="bp${uid}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="3" height="6" fill="#fff"/><rect x="3" width="3" height="6" fill="#1565c0"/>
+            </pattern>
+        </defs>`;
+
+        routes.segments.forEach((seg) => {
+            if (seg.kind === 'v') {
+                svgInner += `<line x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}"
+                    stroke="#0d47a1" stroke-width="2.5" stroke-linecap="square"/>`;
+            } else {
+                svgInner += renderMaterialChevron(seg.x1, seg.x2, seg.y, uid, seg.withHead);
+            }
+        });
+
+        html += `<svg class="mat-flow-svg" width="${totalW}" height="${totalH}">${svgInner}</svg>`;
+
+        const inPos = layout.__INBOUND__;
+        html += `<div class="mat-graph-truck" style="left:0;top:${inPos.yFlow}px;width:${LAYOUT.truck}px">
+            ${SVG.truck()}<span class="lbl vsm-edit-flow" data-flow="inbound" title="点击编辑标签">${esc(data.inbound?.label || '入库')}</span>
+        </div>`;
+
+        const outPos = layout.__OUTBOUND__;
+        html += `<div class="mat-graph-truck" style="left:${outPos.xLeft}px;top:${outPos.yFlow}px;width:${LAYOUT.truck}px">
+            ${SVG.truck()}<span class="lbl vsm-edit-flow" data-flow="outbound" title="点击编辑标签">${esc(data.outbound?.label || '出库')}</span>
+        </div>`;
+
+        graph.processIds.forEach((id) => {
+            const pos = layout[id];
+            const p = data.processById[id];
+            if (!p || !pos) return;
+            const top = pos.yFlow - 20;
+            html += `<div class="mat-graph-node" style="left:${pos.xLeft}px;top:${top}px">
+                ${renderProcessNodeHtml(p)}
+            </div>`;
+        });
+
+        routes.labels.forEach(({ edge, x, invTop, waitTop }) => {
+            const waitStr = minutesToDuration(edge.wait);
+            if (waitStr && waitStr !== '0') {
+                html += `<div class="mat-edge-wait" style="left:${x}px;top:${waitTop}px">${esc(waitStr)}</div>`;
+            }
+            html += `<div class="mat-edge-inv" style="left:${x}px;top:${invTop}px">
+                ${SVG.inventory('I', uid)}
+            </div>`;
+        });
+
+        html += '</div>';
+        return html;
+    }
+
+    function renderMaterialLinear(cols, widths, uid) {
+        let html = '<div class="vsm-grid">';
+        cols.forEach((col, i) => {
+            const w = widths[i];
+            html += `<div class="vsm-col ${colClass(col)}" style="width:${w}px">`;
+            html += '<div class="mat-band">';
+            if (col.type === 'truck-in') {
+                html += `<div class="mat-truck">${SVG.truck()}<span class="lbl vsm-edit-flow" data-flow="inbound" title="点击编辑标签">${esc(col.label)}</span></div>`;
+            } else if (col.type === 'truck-out') {
+                html += `<div class="mat-arrow-row">${SVG.materialArrow(uid)}</div>`;
+                html += `<div class="mat-truck">${SVG.truck()}<span class="lbl vsm-edit-flow" data-flow="outbound" title="点击编辑标签">${esc(col.label)}</span></div>`;
+            } else if (col.type === 'inventory' || col.type === 'fifo') {
+                html += `<div class="mat-arrow-row">${SVG.materialArrow(uid)}</div>`;
+                html += `<div class="mat-inv-row">${col.type === 'fifo' ? SVG.fifo() : SVG.inventory(col.quantity, uid)}
+                    <span class="inv-qty-below">${esc(col.quantity ?? '')}</span></div>`;
+            } else if (col.type === 'process') {
+                const p = col.process;
+                html += renderProcessNodeHtml(p);
+            }
+            html += '</div></div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function renderMap(data) {
+        const { cols, uid } = buildColumns(data);
+        const widths = cols.map(colWidth);
+        const totalW = widths.reduce((a, b) => a + b, 0);
+        let html = '<div class="vsm-template">';
+
+        const matStart = widths[0];
+        const matEnd = totalW - widths[widths.length - 1];
+        const pcX = (matStart + matEnd) / 2;
+        const supX = widths[0] / 2;
+        const custX = totalW - widths[widths.length - 1] / 2;
+
+        html += '<div class="vsm-zone info"><span class="zone-badge">信息流</span>';
+        html += `<div class="info-stage" style="width:${totalW}px;height:${INFO.stageH}px;--info-grid-top:${INFO.gridTop}px;--info-pc-top:${INFO.pcTop}px">`;
+        html += '<div class="vsm-grid" id="info-grid">';
+        cols.forEach((col, i) => {
+            const w = widths[i];
+            html += `<div class="vsm-col ${colClass(col)}" style="width:${w}px">`;
+            html += '<div class="info-band">';
+            if (i === 0 && data.supplier) {
+                html += `<div class="info-entity">${SVG.supplier()}<span class="lbl vsm-edit-entity" data-entity="supplier" title="点击编辑名称">${esc(data.supplier.name)}</span></div>`;
+            } else if (i === cols.length - 1 && data.customer) {
+                html += `<div class="info-entity">${SVG.customer()}<span class="lbl vsm-edit-entity" data-entity="customer" title="点击编辑名称">${esc(data.customer.name)}</span></div>`;
+            }
+            html += '</div></div>';
+        });
+        html += '</div>';
+        const pc = data.production_control || { name: '生产计划部' };
+        html += `<div class="pc-wrap" style="left:${pcX}px">
+            <div class="pc-box"><div class="pc-header"><span class="vsm-edit-entity" data-entity="production_control" title="点击编辑名称">${esc(pc.name)}</span></div></div>
+        </div>`;
+        html += buildInfoFlowSvg(data, { totalW, pcX, supX, custX, uid });
+        html += '</div></div>';
+
+        const useGraphMaterial = data.hasBranching && data.graphLayout && data.graph;
+        html += '<div class="vsm-zone material"><span class="zone-badge">物料流</span>';
+        if (useGraphMaterial) {
+            html += renderMaterialGraph(data, data.graphLayout, uid);
+        } else {
+            html += renderMaterialLinear(cols, widths, uid);
+        }
+        html += '</div>';
+
+        const timelineW = useGraphMaterial ? data.graphLayout.totalW : totalW;
+        html += '<div class="vsm-zone timeline"><span class="zone-badge">时间阶梯</span>';
+        html += `<div class="timeline-track${useGraphMaterial ? ' graph-aligned' : ''}" style="width:${timelineW}px">`;
+        html += `<svg id="ladder-svg" width="${timelineW}" height="72" aria-label="时间阶梯"></svg>`;
+        html += '</div>';
+        if (data.timeline_summary) {
+            const t = data.timeline_summary;
+            html += `<div class="timeline-summary">
+                <strong>Production Lead Time: ${esc(t.production_lead_time || '')}</strong>
+                <strong>Processing Time: ${esc(t.processing_time || '')}</strong>
+                <strong>Value-Added Ratio: ${esc(t.value_added_ratio || '')}</strong>
+            </div>`;
+        }
+        html += '</div></div>';
+
+        lastLayout = {
+            cols,
+            widths,
+            totalW,
+            timelineW,
+            uid,
+            data,
+            materialMode: useGraphMaterial ? 'graph' : 'linear',
+            ladderMode: useGraphMaterial ? 'graph' : 'linear',
+            graphLayout: data.graphLayout || null,
+            criticalPath: data.criticalPath || null
+        };
+        return html;
+    }
+
+    function getRankProcessIds(layout, rank) {
+        return Object.keys(layout).filter(
+            (k) => !k.startsWith('__') && layout[k].rank === rank
+        );
+    }
+
+    /** 工序加工时间上限（分钟），区间取 max 端 */
+    function processCycleMaxMinutes(p) {
+        const c = p?.timeline?.cycle ?? p?.data?.['C/T'] ?? '';
+        const parsed = parseMinutesCell(String(c));
+        if (parsed == null) return 0;
+        if (typeof parsed === 'object') return parsed.max;
+        return parsed;
+    }
+
+    /** 同一列（并行分支）取加工时间最大值，与物料流分叉语义一致 */
+    function maxRankCycleLabel(data, layout, rank) {
+        const ids = getRankProcessIds(layout, rank);
+        if (!ids.length) return '';
+        const maxMin = Math.max(0, ...ids.map((id) => processCycleMaxMinutes(data.processById[id])));
+        return maxMin > 0 ? minutesToDuration(maxMin) : '';
+    }
+
+    /** 同一列并行工序的入边等待取最大值 */
+    function maxRankIncomingWaitLabel(data, layout, rank) {
+        const ids = getRankProcessIds(layout, rank);
+        if (!ids.length) return '';
+        let maxWait = 0;
+        ids.forEach((id) => {
+            const edge = data.graph?.edges?.find((e) => e.to === id);
+            maxWait = Math.max(maxWait, Number(edge?.wait) || 0);
+        });
+        const w = minutesToDuration(maxWait);
+        return w && w !== '0' ? w : '';
+    }
+
+    function getIncomingWaitLabel(data, procId) {
+        const edge = data.graph?.edges?.find((e) => e.to === procId);
+        const w = minutesToDuration(edge?.wait);
+        return w && w !== '0' ? w : '';
+    }
+
+    /** 步骤 4：时间阶梯沿关键路径，列宽与 graphLayout 对齐（上=等待/link列，下=加工/工序列） */
+    function drawGraphLadder() {
+        const L = lastLayout;
+        const layout = L.graphLayout?.layout;
+        const path = L.criticalPath || [];
+        const svg = document.getElementById('ladder-svg');
+        if (!svg || !layout) return;
+
+        const HIGH = 12;
+        const LOW = 44;
+        const LABEL_ABOVE = 6; /* 标注均在对应阶梯线段上侧 */
+        const procIds = path.filter((id) => id !== '__INBOUND__' && id !== '__OUTBOUND__');
+        if (!procIds.length) return;
+
+        const truckW = LAYOUT.truck;
+        const outX = layout.__OUTBOUND__?.xLeft ?? (L.graphLayout.totalW - truckW);
+        const texts = [];
+        const drawnRanks = new Set();
+
+        let x = 0;
+        let y = LOW;
+        let d = `M 0 ${LOW} L ${truckW} ${LOW}`;
+        x = truckW;
+
+        procIds.forEach((id) => {
+            const pos = layout[id];
+            if (!pos) return;
+
+            const linkStart = x;
+            const rank = pos.rank;
+            const rankIds = getRankProcessIds(layout, rank);
+            const isParallelRank = rankIds.length > 1;
+
+            if (y !== HIGH) {
+                d += ` L ${x} ${HIGH}`;
+                y = HIGH;
+            }
+
+            d += ` L ${pos.xLeft} ${HIGH}`;
+            const wait = isParallelRank
+                ? maxRankIncomingWaitLabel(L.data, layout, rank)
+                : getIncomingWaitLabel(L.data, id);
+            if (wait) {
+                texts.push({ x: (linkStart + pos.xLeft) / 2, y: HIGH - LABEL_ABOVE, t: wait, fill: '#c62828' });
+            }
+
+            d += ` L ${pos.xLeft} ${LOW}`;
+            y = LOW;
+            d += ` L ${pos.xRight} ${LOW}`;
+
+            if (!drawnRanks.has(rank)) {
+                drawnRanks.add(rank);
+                const cycle = isParallelRank
+                    ? maxRankCycleLabel(L.data, layout, rank)
+                    : (L.data.processById[id]?.timeline?.cycle ?? '');
+                if (cycle) {
+                    texts.push({ x: pos.xCenter, y: LOW - LABEL_ABOVE, t: cycle, fill: '#2e7d32' });
+                }
+            }
+
+            x = pos.xRight;
+        });
+
+        if (y !== LOW) {
+            d += ` L ${x} ${LOW}`;
+        }
+        d += ` L ${outX} ${LOW}`;
+
+        let inner = `<path d="${d}" fill="none" stroke="#000" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/>`;
+        texts.forEach(({ x, y, t, fill }) => {
+            inner += `<text x="${x}" y="${y}" font-size="12" font-weight="bold" fill="${fill}" text-anchor="middle">${esc(t)}</text>`;
+        });
+        svg.innerHTML = inner;
+    }
+
+    /** PC → 外部：PC 侧边 → 水平路由 → 工厂顶边（箭头指向供应商/客户） */
+    function pathPcToEntity(pcEdgeX, entX) {
+        const ry = INFO.outLaneY;
+        return `M ${pcEdgeX} ${ry} L ${entX} ${ry} L ${entX} ${INFO.entTopY}`;
+    }
+
+    /** 外部 → PC：工厂顶边 → 水平路由 → PC 侧边（箭头指向计划框） */
+    function pathEntityToPc(entX, pcEdgeX) {
+        const ry = INFO.inLaneY;
+        return `M ${entX} ${INFO.entTopY} L ${entX} ${ry} L ${pcEdgeX} ${ry}`;
+    }
+
+    function shouldSkipInfoFlow(f) {
+        const from = f.from === 'ERP' ? 'PC' : f.from;
+        const to = f.to === 'ERP' ? 'PC' : f.to;
+        if (f.content === '供货通知') return true;
+        if (f.type === 'manual_info') return true;
+        if (from === 'SUPPLIER' && to === 'INBOUND') return true;
+        if (!['PC', 'CUSTOMER', 'SUPPLIER'].includes(from) || !['PC', 'CUSTOMER', 'SUPPLIER'].includes(to)) return true;
+        if (from === to) return true;
+        return false;
+    }
+
+    function buildInfoFlowSvg(data, { totalW, pcX, supX, custX, uid }) {
+        const pcLeftX = pcX - INFO.pcHalfW;
+        const pcRightX = pcX + INFO.pcHalfW;
+        const markerId = `info-mk-${uid}`;
+        const paths = [];
+        (data.flows || []).forEach((f) => {
+            if (shouldSkipInfoFlow(f)) return;
+            const from = f.from === 'ERP' ? 'PC' : f.from;
+            const to = f.to === 'ERP' ? 'PC' : f.to;
+            let d = null;
+            if (to === 'PC') {
+                const fx = from === 'CUSTOMER' ? custX : supX;
+                const edge = from === 'CUSTOMER' ? pcRightX : pcLeftX;
+                d = pathEntityToPc(fx, edge);
+            } else if (from === 'PC') {
+                const tx = to === 'CUSTOMER' ? custX : supX;
+                const edge = to === 'CUSTOMER' ? pcRightX : pcLeftX;
+                d = pathPcToEntity(edge, tx);
+            }
+            if (d) paths.push(d);
+        });
+
+        let inner = `<defs>
+            <marker id="${markerId}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                <polygon points="0 0,8 4,0 8" fill="#c62828"/>
+            </marker>
+        </defs>`;
+        paths.forEach((d) => {
+            inner += `<path d="${d}" fill="none" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#${markerId})"/>`;
+        });
+        return `<svg class="info-flow-svg" width="${totalW}" height="${INFO.stageH}" viewBox="0 0 ${totalW} ${INFO.stageH}" aria-label="信息流">${inner}</svg>`;
+    }
+
+    function drawLadder() {
+        const L = lastLayout;
+        if (!L) return;
+        if (L.ladderMode === 'graph') {
+            drawGraphLadder();
+            return;
+        }
+        const svg = document.getElementById('ladder-svg');
+        if (!svg) return;
+
+        const HIGH = 12;
+        const LOW = 44;
+        const LABEL_ABOVE = 6;
+        const isInv = (c) => c.type === 'inventory' || c.type === 'fifo';
+
+        let x = 0;
+        let y = LOW;
+        let d = `M ${x} ${y}`;
+        const texts = [];
+
+        L.cols.forEach((col, i) => {
+            const w = L.widths[i];
+            const cx = x + w / 2;
+            const next = L.cols[i + 1];
+
+            if (col.type === 'truck-in') {
+                d += ` L ${x + w} ${y}`;
+                if (next && isInv(next)) {
+                    d += ` L ${x + w} ${HIGH}`;
+                    y = HIGH;
+                }
+            } else if (isInv(col)) {
+                if (y !== HIGH) {
+                    d += ` L ${x} ${HIGH}`;
+                    y = HIGH;
+                }
+                d += ` L ${x + w} ${HIGH}`;
+                if (col.wait) texts.push({ x: cx, y: HIGH - LABEL_ABOVE, t: col.wait, fill: '#c62828' });
+                if (next && next.type === 'process') {
+                    d += ` L ${x + w} ${LOW}`;
+                    y = LOW;
+                }
+            } else if (col.type === 'process') {
+                if (y !== LOW) {
+                    d += ` L ${x} ${LOW}`;
+                    y = LOW;
+                }
+                d += ` L ${x + w} ${LOW}`;
+                if (col.cycle) texts.push({ x: cx, y: LOW - LABEL_ABOVE, t: col.cycle, fill: '#2e7d32' });
+                if (next && isInv(next)) {
+                    d += ` L ${x + w} ${HIGH}`;
+                    y = HIGH;
+                }
+            } else {
+                d += ` L ${x + w} ${y}`;
+            }
+            x += w;
+        });
+
+        let inner = `<path d="${d}" fill="none" stroke="#000" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/>`;
+        texts.forEach(({ x, y, t, fill }) => {
+            inner += `<text x="${x}" y="${y}" font-size="12" font-weight="bold" fill="${fill}" text-anchor="middle">${esc(t)}</text>`;
+        });
+        svg.innerHTML = inner;
+    }
+
+    const SYMBOL_ROWS = [
+        { cat: '外部对象', name: '供应商/客户', meaning: '价值流两端的外部对象。供应商通常在左侧，客户在右侧，界定输入端与需求端。', html: () => `
+            <div>${SVG.externalEntity('supplier')}<div class="role-hint">供应商（左）</div></div>
+            <div style="margin-top:8px">${SVG.externalEntity('customer')}<div class="role-hint">客户（右）</div></div>` },
+        { cat: '控制与计划', name: '生产控制/计划职能', meaning: '接收预测与订单，形成计划并分发信息流。', html: () => `
+            <svg width="140" height="40" viewBox="0 0 140 40"><rect x="1" y="1" width="138" height="38" fill="#fff" stroke="#000" stroke-width="2"/>
+            <rect x="1" y="1" width="138" height="14" fill="#ffcc80" stroke="#000" stroke-width="2"/>
+            <text x="70" y="30" font-size="11" font-weight="bold" text-anchor="middle">生产计划部</text></svg>` },
+        { cat: '作业过程', name: '工序/过程框', meaning: '加工、装配、检验、包装等物料流主体。', html: () => `
+            <svg width="110" height="36" viewBox="0 0 110 36"><rect x="1" y="1" width="108" height="34" fill="#b3e5fc" stroke="#000" stroke-width="2"/>
+            <text x="55" y="22" font-size="11" font-weight="bold" text-anchor="middle">工序</text></svg>` },
+        { cat: '作业过程', name: '数据框', meaning: '记录 C/T、C/O、稼动率等参数。', html: () => `
+            <svg width="100" height="48" viewBox="0 0 100 48"><rect fill="#e3f2fd" stroke="#000" x="1" y="1" width="98" height="46"/>
+            <line x1="1" y1="16" x2="99" y2="16" stroke="#000"/><line x1="50" y1="1" x2="50" y2="47" stroke="#000"/>
+            <text x="25" y="11" font-size="8" text-anchor="middle">C/T</text><text x="75" y="11" font-size="8" text-anchor="middle">值</text></svg>` },
+        { cat: '库存与等待', name: '库存/在制品', meaning: '工序间库存与等待（非增值）。', html: () => SVG.inventory('I', 0) },
+        { cat: '流动关系', name: '物料流箭头', meaning: '材料、半成品、成品的推动方向。', html: () => SVG.materialArrow(0) },
+        { cat: '流动关系', name: '信息流箭头', meaning: '订单、计划、排程等常规信息（虚线）。', html: () => `
+            <svg width="72" height="20" viewBox="0 0 72 20"><line x1="4" y1="10" x2="58" y2="10" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,4"/>
+            <polygon points="58,6 70,10 58,14" fill="#c62828"/></svg>` },
+        { cat: '流动关系', name: '电子信息流', meaning: '电子化预测、订单、系统指令（折线）。', html: () => `
+            <svg width="72" height="24" viewBox="0 0 72 24"><polyline points="4,12 16,5 28,19 40,7 52,17 60,12" fill="none" stroke="#333" stroke-width="1.5"/>
+            <polygon points="60,8 70,12 60,16" fill="#333"/></svg>` },
+        { cat: '物流活动', name: '运输/发运', meaning: '进货、送货（卡车图标）。', html: () => SVG.truck() },
+        { cat: '拉动与排队', name: 'FIFO通道', meaning: '先进先出缓冲通道。', html: () => SVG.fifo() },
+        { cat: '时间与指标', name: '时间阶梯', meaning: '上：等待时间（红）；下：加工时间（绿）；锯齿折线连接。', html: () => `
+            <svg width="120" height="44" viewBox="0 0 120 44"><path d="M 4,32 L 24,32 L 24,10 L 44,10 L 44,32 L 64,32 L 64,10 L 84,10 L 84,32 L 116,32" fill="none" stroke="#000" stroke-width="2"/>
+            <text x="34" y="8" font-size="9" fill="#c62828" font-weight="bold">等待</text>
+            <text x="54" y="40" font-size="9" fill="#2e7d32" font-weight="bold">加工</text></svg>` }
+    ];
+
+    function renderSymbolSheet() {
+        const rows = SYMBOL_ROWS.map(r => `<tr>
+            <td>${esc(r.cat)}</td>
+            <td>${esc(r.name)}</td>
+            <td class="symbol-cell">${typeof r.html === 'function' ? r.html() : r.html}</td>
+            <td>${esc(r.meaning)}</td>
+        </tr>`).join('');
+        return `<div class="symbol-sheet">
+            <h2>二、VSM 元素初稿 — 标准符号表</h2>
+            <p class="note">依据《VSM样例清单与元素初稿》。外部对象为工厂锯齿顶符号：供应商置于价值流左侧，客户置于右侧。</p>
+            <table class="symbol-table">
+                <thead><tr><th>类别</th><th>元素名称</th><th>符号示意</th><th>元素含义与作用</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    /* ========== 图上 inline 编辑（工序 / 实体名称） ========== */
+
+    const ENTITY_NAME_LABELS = {
+        supplier: '供应商名称',
+        customer: '客户名称',
+        production_control: '生产计划部名称'
+    };
+
+    const ENTITY_DEFAULT_NAMES = {
+        supplier: '供应商',
+        customer: '客户',
+        production_control: '生产计划部'
+    };
+
+    const FLOW_LABEL_NAMES = {
+        inbound: '入库标签',
+        outbound: '出库标签'
+    };
+
+    const FLOW_DEFAULT_LABELS = {
+        inbound: '原材料入库',
+        outbound: '成品发运'
+    };
+
+    let activeInlineEditor = null;
+    let skipNextInlineBlur = false;
+
+    function getEntityNameFromRaw(raw, entityKey) {
+        const fallback = ENTITY_DEFAULT_NAMES[entityKey] || '';
+        if (isMacroFormat(raw)) {
+            return raw.macro_entities?.[entityKey]?.name || fallback;
+        }
+        return raw[entityKey]?.name || raw.macro_entities?.[entityKey]?.name || fallback;
+    }
+
+    function updateProcessNameInRaw(raw, processId, newName) {
+        const trimmed = String(newName ?? '').trim();
+        if (!trimmed) throw new Error('工序名称不能为空');
+        const list = raw.processes;
+        if (!Array.isArray(list) || !list.length) throw new Error('JSON 中无 processes');
+        const proc = list.find((p) => p.id === processId);
+        if (!proc) throw new Error(`未找到工序 ${processId}`);
+        proc.name = trimmed;
+        return raw;
+    }
+
+    function updateEntityNameInRaw(raw, entityKey, newName) {
+        const trimmed = String(newName ?? '').trim();
+        const label = ENTITY_NAME_LABELS[entityKey] || '名称';
+        if (!trimmed) throw new Error(`${label}不能为空`);
+        if (isMacroFormat(raw)) {
+            if (!raw.macro_entities) raw.macro_entities = {};
+            if (!raw.macro_entities[entityKey]) raw.macro_entities[entityKey] = {};
+            raw.macro_entities[entityKey].name = trimmed;
+        } else {
+            if (!raw[entityKey]) raw[entityKey] = {};
+            raw[entityKey].name = trimmed;
+        }
+        return raw;
+    }
+
+    function getFlowLabelFromRaw(raw, flowKey) {
+        return raw[flowKey]?.label || FLOW_DEFAULT_LABELS[flowKey] || '';
+    }
+
+    function updateFlowLabelInRaw(raw, flowKey, newLabel) {
+        const trimmed = String(newLabel ?? '').trim();
+        const label = FLOW_LABEL_NAMES[flowKey] || '标签';
+        if (!trimmed) throw new Error(`${label}不能为空`);
+        if (!raw[flowKey]) raw[flowKey] = {};
+        raw[flowKey].label = trimmed;
+        return raw;
+    }
+
+    function findRawProcess(raw, processId) {
+        const proc = (raw.processes || []).find((p) => p.id === processId);
+        if (!proc) throw new Error(`未找到工序 ${processId}`);
+        return proc;
+    }
+
+    function getProcessDataFieldFromRaw(raw, processId, fieldKey) {
+        const proc = (raw.processes || []).find((p) => p.id === processId);
+        if (!proc) return '';
+        const tl = proc.timeline || {};
+        const ie = proc.ie_data || {};
+        switch (fieldKey) {
+            case 'C/T':
+                return minutesToDuration(tl.cycle_time_minutes) || '';
+            case 'C/O':
+                return minutesToDuration(tl.setup_time_minutes) || '0';
+            case '稼动率':
+                return ie.availability_rate != null
+                    ? `${Math.round(Number(ie.availability_rate) * 100)}%`
+                    : '';
+            case '性能率':
+                return ie.performance_rate != null
+                    ? `${Math.round(Number(ie.performance_rate) * 100)}%`
+                    : '';
+            case '一次合格率':
+                return ie.quality_yield != null
+                    ? `${Math.round(Number(ie.quality_yield) * 100)}%`
+                    : '';
+            case 'OEE': {
+                if (ie.availability_rate == null || ie.quality_yield == null) return '';
+                const a = Number(ie.availability_rate);
+                const q = Number(ie.quality_yield);
+                const perf = ie.performance_rate != null ? Number(ie.performance_rate) : 1;
+                if (!Number.isFinite(a) || !Number.isFinite(q) || !Number.isFinite(perf)) return '';
+                return `${Math.round(a * perf * q * 100)}%`;
+            }
+            case '资源':
+                return (proc.resources || []).join('、');
+            case 'UAF活动':
+                return proc.uaf_mapping?.operational_activity || '';
+            case '瓶颈说明':
+                return proc.bottleneck_reason || '';
+            default:
+                return proc.data?.[fieldKey] != null ? String(proc.data[fieldKey]) : '';
+        }
+    }
+
+    function updateProcessDataFieldInRaw(raw, processId, fieldKey, newValue) {
+        const trimmed = String(newValue ?? '').trim();
+        const proc = findRawProcess(raw, processId);
+
+        if (fieldKey === 'OEE') {
+            throw new Error('OEE 由稼动率×性能率×合格率自动计算，请改这三项');
+        }
+
+        if (!isMacroFormat(raw) && !proc.timeline && !proc.ie_data && proc.data
+            && !['C/T', 'C/O', '稼动率', '性能率', '一次合格率', '资源', 'UAF活动', '瓶颈说明'].includes(fieldKey)) {
+            if (!trimmed) throw new Error(`${fieldKey}不能为空`);
+            proc.data[fieldKey] = trimmed;
+            return raw;
+        }
+
+        if (!proc.timeline) proc.timeline = {};
+        if (!proc.ie_data) proc.ie_data = {};
+        if (!proc.uaf_mapping) proc.uaf_mapping = {};
+
+        switch (fieldKey) {
+            case 'C/T': {
+                if (!trimmed || trimmed === '—') throw new Error('C/T 不能为空');
+                const parsed = parseMinutesCell(trimmed);
+                if (parsed == null) throw new Error('C/T 格式无效，可用 4h、2d、960~1080 等');
+                proc.timeline.cycle_time_minutes = parsed;
+                break;
+            }
+            case 'C/O': {
+                const parsed = parseMinutesCell(trimmed || '0');
+                proc.timeline.setup_time_minutes = parsed ?? 0;
+                break;
+            }
+            case '稼动率': {
+                if (!trimmed) throw new Error('稼动率不能为空');
+                const rate = parseRate(trimmed);
+                if (rate == null) throw new Error('稼动率格式无效，如 85% 或 0.85');
+                proc.ie_data.availability_rate = rate;
+                break;
+            }
+            case '性能率': {
+                if (!trimmed) {
+                    delete proc.ie_data.performance_rate;
+                    break;
+                }
+                const rate = parseRate(trimmed);
+                if (rate == null) throw new Error('性能率格式无效，如 95% 或 0.95');
+                proc.ie_data.performance_rate = rate;
+                break;
+            }
+            case '一次合格率': {
+                if (!trimmed) throw new Error('一次合格率不能为空');
+                const rate = parseRate(trimmed);
+                if (rate == null) throw new Error('一次合格率格式无效，如 99% 或 0.99');
+                proc.ie_data.quality_yield = rate;
+                break;
+            }
+            case '资源':
+                proc.resources = trimmed
+                    ? trimmed.split(/[,，;；|/\s、]+/).map((s) => s.trim()).filter(Boolean)
+                    : [];
+                break;
+            case 'UAF活动': {
+                if (!trimmed) throw new Error('UAF活动不能为空');
+                proc.uaf_mapping.operational_activity = trimmed;
+                break;
+            }
+            case '瓶颈说明':
+                proc.bottleneck_reason = trimmed;
+                if (trimmed) proc.is_bottleneck = true;
+                break;
+            default:
+                if (isMacroFormat(raw)) throw new Error(`不支持编辑字段 ${fieldKey}`);
+                if (!proc.data) proc.data = {};
+                if (!trimmed) throw new Error(`${fieldKey}不能为空`);
+                proc.data[fieldKey] = trimmed;
+        }
+        return raw;
+    }
+
+    function attachInlineEditorInput(input, onCommit, onCancel) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                skipNextInlineBlur = true;
+                onCancel();
+            }
+        });
+        input.addEventListener('blur', () => {
+            if (skipNextInlineBlur) {
+                skipNextInlineBlur = false;
+                return;
+            }
+            onCommit();
+        });
+    }
+
+    function beginInlineTextEdit(titleEl) {
+        if (activeInlineEditor || currentTab !== 'map') return;
+
+        const processId = titleEl.dataset.processId;
+        const entityKey = titleEl.dataset.entity;
+        const flowKey = titleEl.dataset.flow;
+        const dataField = titleEl.dataset.field;
+        const isProcessData = titleEl.classList.contains('vsm-edit-data') && dataField;
+        if (!isProcessData && !processId && !entityKey && !flowKey) return;
+
+        let raw;
+        try {
+            raw = JSON.parse(document.getElementById('json-input').value);
+        } catch {
+            return;
+        }
+
+        let currentValue = '';
+        let ariaLabel = '';
+        let editorKind = null;
+        let editorKey = null;
+        let editorField = null;
+
+        if (isProcessData) {
+            if (!processId) return;
+            currentValue = getProcessDataFieldFromRaw(raw, processId, dataField);
+            if (currentValue === '—') currentValue = '';
+            ariaLabel = `${processId} ${dataField}`;
+            editorKind = 'processData';
+            editorKey = processId;
+            editorField = dataField;
+        } else if (processId && titleEl.classList.contains('vsm-edit-name')) {
+            const proc = (raw.processes || []).find((p) => p.id === processId);
+            if (!proc) return;
+            currentValue = proc.name || processId;
+            ariaLabel = '工序名称';
+            editorKind = 'process';
+            editorKey = processId;
+        } else if (entityKey) {
+            currentValue = getEntityNameFromRaw(raw, entityKey);
+            ariaLabel = ENTITY_NAME_LABELS[entityKey] || '名称';
+            editorKind = 'entity';
+            editorKey = entityKey;
+        } else {
+            currentValue = getFlowLabelFromRaw(raw, flowKey);
+            ariaLabel = FLOW_LABEL_NAMES[flowKey] || '标签';
+            editorKind = 'flow';
+            editorKey = flowKey;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'vsm-edit-name-input';
+        input.value = currentValue;
+        input.setAttribute('aria-label', ariaLabel);
+
+        activeInlineEditor = { kind: editorKind, key: editorKey, field: editorField, hostEl: titleEl, input };
+
+        if (isProcessData) {
+            titleEl.textContent = '';
+            titleEl.appendChild(input);
+        } else {
+            titleEl.replaceWith(input);
+        }
+        input.focus();
+        input.select();
+
+        attachInlineEditorInput(
+            input,
+            () => finishInlineTextEdit(true),
+            () => finishInlineTextEdit(false)
+        );
+    }
+
+    function finishInlineTextEdit(save) {
+        if (!activeInlineEditor) return;
+        const { kind, key, field, input } = activeInlineEditor;
+        activeInlineEditor = null;
+
+        if (!save) {
+            render();
+            return;
+        }
+
+        const err = document.getElementById('error');
+        try {
+            const raw = JSON.parse(document.getElementById('json-input').value);
+            if (kind === 'process') {
+                updateProcessNameInRaw(raw, key, input.value);
+            } else if (kind === 'processData') {
+                updateProcessDataFieldInRaw(raw, key, field, input.value);
+            } else if (kind === 'entity') {
+                updateEntityNameInRaw(raw, key, input.value);
+            } else {
+                updateFlowLabelInRaw(raw, key, input.value);
+            }
+            document.getElementById('json-input').value = JSON.stringify(raw, null, 2);
+            err.style.display = 'none';
+            render();
+        } catch (e) {
+            err.textContent = e.message;
+            err.style.display = 'block';
+            render();
+        }
+    }
+
+    function initMapInlineEdit() {
+        document.getElementById('output').addEventListener('click', (e) => {
+            const el = e.target.closest('.vsm-edit-name, .vsm-edit-entity, .vsm-edit-flow, .vsm-edit-data');
+            if (!el) return;
+            e.preventDefault();
+            e.stopPropagation();
+            beginInlineTextEdit(el);
+        });
+    }
+
+    function durationToMinutes(val) {
+        if (val == null || val === '') return null;
+        if (typeof val === 'number' && Number.isFinite(val)) return val;
+        const s = String(val).trim();
+        if (!s || s === '—' || s === '-') return null;
+        let m = s.match(/^(\d+(?:\.\d+)?)\s*天/);
+        if (m) return parseFloat(m[1]) * 1440;
+        m = s.match(/^(\d+(?:\.\d+)?)\s*小时/);
+        if (m) return parseFloat(m[1]) * 60;
+        m = s.match(/^(\d+(?:\.\d+)?)\s*h\b/i);
+        if (m) return parseFloat(m[1]) * 60;
+        m = s.match(/^(\d+(?:\.\d+)?)\s*分钟?/);
+        if (m) return parseFloat(m[1]);
+        m = s.match(/^(\d+(?:\.\d+)?)\s*min/i);
+        if (m) return parseFloat(m[1]);
+        if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+        return null;
+    }
+
+    function fmtMinutes(min) {
+        if (min == null || !Number.isFinite(min)) return '—';
+        if (Math.abs(min) >= 1440) return `${(min / 1440).toFixed(1)}天 (${Math.round(min)}分钟)`;
+        if (Math.abs(min) >= 60) return `${(min / 60).toFixed(1)}小时 (${Math.round(min)}分钟)`;
+        return `${Math.round(min * 10) / 10}分钟`;
+    }
+
+    function fmtPct(x) {
+        if (x == null || !Number.isFinite(x)) return '—';
+        return `${(x * 100).toFixed(1)}%`;
+    }
+
+    function metricMinutes(val) {
+        if (val == null || val === '') return 0;
+        if (typeof val === 'number' && Number.isFinite(val)) return Math.max(0, val);
+        if (typeof val === 'object') {
+            const a = Number(val.min);
+            const b = Number(val.max);
+            const lo = Number.isFinite(a) ? a : 0;
+            const hi = Number.isFinite(b) ? b : lo;
+            return Math.max(lo, hi);
+        }
+        const n = Number(val);
+        if (Number.isFinite(n)) return Math.max(0, n);
+        return durationToMinutes(val) || 0;
+    }
+
+    function computeVsmMetrics(raw, normalizedData) {
+        const processes = Array.isArray(raw?.processes) ? raw.processes : [];
+        const inboundWait = metricMinutes(raw?.inbound?.wait_time_minutes);
+
+        // 与图底 timeline_summary 对齐：有分叉/合流时 PLT 只加关键路径，不把并行支线时间相加
+        const branching = !!(normalizedData?.hasBranching
+            || (processes.length && hasBranching(processes)));
+        let criticalPath = Array.isArray(normalizedData?.criticalPath)
+            ? normalizedData.criticalPath
+            : null;
+        if (branching && (!criticalPath || !criticalPath.length)) {
+            criticalPath = pickCriticalPath(buildProcessGraph(processes), processes);
+        }
+        const criticalPathIds = (criticalPath || [])
+            .filter((id) => id && id !== '__INBOUND__' && id !== '__OUTBOUND__');
+        const onCriticalPath = new Set(criticalPathIds);
+
+        const rows = processes.map((p, idx) => {
+            const tl = p.timeline || {};
+            const ie = p.ie_data || {};
+            const ct = metricMinutes(tl.cycle_time_minutes);
+            const co = metricMinutes(tl.setup_time_minutes);
+            const wait = metricMinutes(tl.wait_time_minutes);
+            const available = Number(ie.available_time_minutes);
+            const uptime = ie.availability_rate != null ? Number(ie.availability_rate) : null;
+            const yieldRate = ie.quality_yield != null ? Number(ie.quality_yield) : null;
+            const performanceInput = ie.performance_rate != null ? Number(ie.performance_rate) : null;
+            // 表内无性能率时默认按 1.0（无速度损失数据），OEE 仍可算
+            const performanceAssumed = !(performanceInput != null && Number.isFinite(performanceInput));
+            const performanceRate = performanceAssumed ? 1 : performanceInput;
+            const operators = ie.operators != null ? Number(ie.operators) : null;
+            const batchSize = ie.batch_size != null ? Number(ie.batch_size) : (p.batch_size != null ? Number(p.batch_size) : null);
+            const dailyCapacity = (Number.isFinite(available) && available > 0 && ct > 0)
+                ? available / ct
+                : null;
+            const actualDailyCapacity = (dailyCapacity != null && uptime != null)
+                ? dailyCapacity * uptime
+                : null;
+            const batchProcessTime = (batchSize != null && batchSize > 0)
+                ? batchSize * ct + co
+                : null;
+            const oee = (uptime != null && Number.isFinite(uptime)
+                && yieldRate != null && Number.isFinite(yieldRate)
+                && Number.isFinite(performanceRate))
+                ? uptime * performanceRate * yieldRate
+                : null;
+            const rawCt = metricMinutes(tl.raw_process_minutes);
+            const id = p.id || `P${idx + 1}`;
+            // 标签在前端推导：JSON 只存业务数；录入 vs 计算、质量备注不写进文件
+            const provenance = inferProcessProvenance(p, {
+                hasCt: ct > 0,
+                hasCo: co > 0,
+                hasWait: wait > 0,
+                hasAvailable: Number.isFinite(available),
+                hasUptime: uptime != null,
+                hasYield: yieldRate != null,
+                hasPerformance: !performanceAssumed,
+                hasBatch: batchSize != null,
+                hasOperators: operators != null,
+                hasRawCt: rawCt > 0
+            });
+            return {
+                id,
+                name: p.name || p.id || `工序${idx + 1}`,
+                ct,
+                co,
+                wait,
+                available: Number.isFinite(available) ? available : null,
+                uptime,
+                yieldRate,
+                performanceRate,
+                performanceAssumed,
+                oee,
+                operators,
+                batchSize,
+                dailyCapacity,
+                actualDailyCapacity,
+                batchProcessTime,
+                isBottleneck: !!p.is_bottleneck,
+                onCriticalPath: !branching || onCriticalPath.has(id),
+                resources: Array.isArray(p.resources) ? p.resources.join('、') : (p.resources || ''),
+                dataStatus: p.data_status || null,
+                provenance
+            };
+        });
+
+        const setupMin = rows.reduce((s, r) => s + (r.co || 0), 0);
+        const pltRows = branching
+            ? criticalPathIds.map((id) => rows.find((r) => r.id === id)).filter(Boolean)
+            : rows;
+        const processingMin = pltRows.reduce((s, r) => s + (r.ct || 0), 0);
+        const waitMin = pltRows.reduce((s, r) => s + (r.wait || 0), 0);
+        // inbound 常与首工序（关键路径起点）等待同源，仅在额外且不同时计入 PLT
+        const firstWait = pltRows[0]?.wait || 0;
+        const extraInbound = (inboundWait > 0 && Math.abs(inboundWait - firstWait) > 0.5)
+            ? inboundWait
+            : 0;
+        const pltMin = waitMin + processingMin + extraInbound;
+        const vaRatio = pltMin > 0 ? processingMin / pltMin : null;
+
+        let rolledYield = null;
+        if (rows.some((r) => r.yieldRate != null)) {
+            rolledYield = rows.reduce((acc, r) => acc * (r.yieldRate != null ? r.yieldRate : 1), 1);
+        }
+
+        const demand = Number(raw?.customer_demand_per_day ?? raw?.value_stream_meta?.daily_demand);
+        const availableGlobal = Number(raw?.available_time_minutes ?? raw?.value_stream_meta?.available_time_minutes);
+        const taktMin = (Number.isFinite(availableGlobal) && availableGlobal > 0 && Number.isFinite(demand) && demand > 0)
+            ? availableGlobal / demand
+            : null;
+        const metaBatch = raw?.value_stream_meta?.batch_size != null
+            ? Number(raw.value_stream_meta.batch_size)
+            : null;
+
+        // 现场汇总质量备注（不依赖 JSON 内嵌 summary）
+        const provenanceLegend = {
+            input: '录入',
+            derived: '计算'
+        };
+
+        // 损失贡献 Top：并行时只看关键路径上的工序，占比分母与 PLT 一致
+        const rankRows = branching ? pltRows : rows;
+        const waitTop = [...rankRows].sort((a, b) => b.wait - a.wait).slice(0, 5).filter((r) => r.wait > 0);
+        const ctTop = [...rankRows].sort((a, b) => b.ct - a.ct).slice(0, 5).filter((r) => r.ct > 0);
+        const bottleneck = rows.find((r) => r.isBottleneck)
+            || (ctTop[0] ? ctTop[0] : null);
+
+        const oeeRows = rows.filter((r) => r.oee != null && Number.isFinite(r.oee));
+        const avgOee = oeeRows.length
+            ? oeeRows.reduce((s, r) => s + r.oee, 0) / oeeRows.length
+            : null;
+        const minOeeRow = oeeRows.length
+            ? [...oeeRows].sort((a, b) => a.oee - b.oee)[0]
+            : null;
+
+        const criticalPathLabel = criticalPathIds.length
+            ? criticalPathIds.join(' → ')
+            : null;
+
+        return {
+            processCount: rows.length,
+            processingMin,
+            waitMin,
+            setupMin,
+            inboundWaitMin: inboundWait || null,
+            extraInboundMin: extraInbound || null,
+            pltMin,
+            vaRatio,
+            pltUsesCriticalPath: branching && criticalPathIds.length > 0,
+            criticalPathIds,
+            criticalPathLabel,
+            rolledYield,
+            avgOee,
+            minOeeRow,
+            taktMin,
+            taktNote: taktMin == null ? '当前无日需求，暂不计算 Takt' : null,
+            dataNotes: null,
+            metaBatch: Number.isFinite(metaBatch) ? metaBatch : null,
+            demand: Number.isFinite(demand) ? demand : null,
+            availableGlobal: Number.isFinite(availableGlobal) ? availableGlobal : null,
+            waitTop,
+            ctTop,
+            bottleneck,
+            rows,
+            provenanceLegend,
+            summaryLabels: {
+                plt: fmtMinutes(pltMin),
+                processing: fmtMinutes(processingMin),
+                va: fmtPct(vaRatio)
+            }
+        };
+    }
+
+    /** 由工序业务字段推断 provenance（不读 JSON 内嵌说明） */
+    function inferProcessProvenance(p, flags) {
+        const status = String(p.data_status || '');
+        const rowSim = status.includes('模拟') && !status.includes('已有');
+        const rowMixed = status.includes('已有') && status.includes('模拟');
+        const ctQ = flags.hasRawCt ? 'measured' : 'simulated';
+        const ieQ = 'simulated';
+        const waitQ = rowSim || rowMixed || !status ? 'simulated' : 'measured';
+        const out = {};
+        const put = (key, quality, note) => {
+            out[key] = { source: 'input', quality, note };
+        };
+        if (flags.hasCt) put('cycle_time_minutes', ctQ, flags.hasRawCt ? '有工艺工时' : '无工艺工时，占位 C/T');
+        if (flags.hasCo) put('setup_time_minutes', ieQ, '表内录入');
+        if (flags.hasWait) put('wait_time_minutes', waitQ, '表内录入');
+        if (flags.hasAvailable) put('available_time_minutes', ieQ, '表内录入');
+        if (flags.hasUptime) put('availability_rate', ieQ, '表内录入');
+        if (flags.hasYield) put('quality_yield', ieQ, '表内录入');
+        if (flags.hasPerformance) put('performance_rate', ieQ, '表内录入');
+        if (flags.hasBatch) put('batch_size', ieQ, '表内录入');
+        if (flags.hasOperators) put('operators', ieQ, '表内录入');
+        if (status) {
+            out._row = {
+                source: 'input',
+                quality: rowSim ? 'simulated' : (rowMixed ? 'mixed' : 'measured'),
+                note: status
+            };
+        }
+        return out;
+    }
+
+    function toggleMetricsPanel(force) {
+        const panel = document.getElementById('metrics-panel');
+        const btn = document.getElementById('btn-metrics');
+        if (!panel) return;
+        metricsPanelOpen = typeof force === 'boolean' ? force : !metricsPanelOpen;
+        panel.classList.toggle('open', metricsPanelOpen);
+        if (btn) btn.classList.toggle('active-panel', metricsPanelOpen);
+        if (metricsPanelOpen) refreshMetricsPanel();
+    }
+
+    function switchMetricsTab(tab) {
+        metricsTab = tab;
+        document.querySelectorAll('#metrics-tabs button').forEach((b) => {
+            b.classList.toggle('active', b.dataset.tab === tab);
+        });
+        refreshMetricsPanel();
+    }
+
+    function refreshMetricsPanel() {
+        const body = document.getElementById('metrics-panel-body');
+        if (!body) return;
+        if (!lastMetrics || !lastMacroRaw) {
+            body.innerHTML = '<div class="metrics-empty">请先渲染价值流图，再查看关键参数。</div>';
+            return;
+        }
+        const m = lastMetrics;
+        if (metricsTab === 'overview') {
+            body.innerHTML = renderMetricsOverview(m);
+        } else if (metricsTab === 'process') {
+            body.innerHTML = renderMetricsProcess(m);
+        } else if (metricsTab === 'loss') {
+            body.innerHTML = renderMetricsLoss(m);
+        } else {
+            body.innerHTML = renderMetricsFormulas(m);
+        }
+    }
+
+    function qualityHint(quality) {
+        if (!quality) return '';
+        const map = {
+            measured: '质量:实测',
+            simulated: '质量:占位',
+            mixed: '质量:混合'
+        };
+        const label = map[quality] || `质量:${quality}`;
+        return `<span class="prov-quality" title="助教表数据状态备注，不影响录入/计算归属">${esc(label)}</span>`;
+    }
+
+    function provBadge(source, note, quality) {
+        if (!source) return '';
+        // 兼容旧 JSON：measured/simulated/mixed 视为录入
+        let src = source;
+        if (src === 'measured' || src === 'simulated' || src === 'mixed') {
+            quality = quality || src;
+            src = 'input';
+        }
+        const map = {
+            input: ['录入', 'prov-input'],
+            derived: ['计算', 'prov-derived']
+        };
+        const info = map[src] || ['录入', 'prov-input'];
+        const titleParts = [];
+        if (note) titleParts.push(note);
+        if (quality) titleParts.push(`质量备注: ${quality}`);
+        const title = titleParts.length ? ` title="${esc(titleParts.join(' | '))}"` : '';
+        return `<span class="prov ${info[1]}"${title}>${info[0]}</span>${src === 'input' ? qualityHint(quality) : ''}`;
+    }
+
+    function provFrom(obj, field, fallbackSource, fallbackNote) {
+        const p = obj && obj[field];
+        if (p && p.source) return provBadge(p.source, p.note || fallbackNote, p.quality);
+        if (fallbackSource) return provBadge(fallbackSource, fallbackNote);
+        return '';
+    }
+
+    function renderProvenanceLegend(m) {
+        const items = [
+            ['input', '录入'],
+            ['derived', '计算']
+        ];
+        return `<div class="prov-legend">${items.map(([src, shortLabel]) => `
+            <span class="item">${provBadge(src)} <span>${esc(shortLabel)}</span></span>
+        `).join('')}</div>`;
+    }
+
+    function renderMetricsOverview(m) {
+        const bn = m.bottleneck
+            ? `${esc(m.bottleneck.id)} ${esc(m.bottleneck.name)}（C/T ${fmtMinutes(m.bottleneck.ct)}）`
+            : '—';
+        const d = 'derived';
+        const inp = 'input';
+        const pltNote = m.pltUsesCriticalPath
+            ? '关键路径 Σ等待 + ΣC/T（并行支线不重复加）'
+            : 'Σ等待 + ΣC/T';
+        const sumScope = m.pltUsesCriticalPath ? '关键路径工序' : '各工序';
+        return `
+            ${renderProvenanceLegend(m)}
+            <h4>价值流总览指标</h4>
+            <table class="metrics-kv">
+                <tr><th>工序数</th><td>${m.processCount}</td></tr>
+                ${m.pltUsesCriticalPath && m.criticalPathLabel ? `<tr><th>关键路径</th><td>${esc(m.criticalPathLabel)}${provBadge(d, '等待+C/T 最长路径')}</td></tr>` : ''}
+                <tr class="highlight"><th>Production Lead Time</th><td>${esc(m.summaryLabels.plt)}${provBadge(d, pltNote)}<br><span class="hint">Σ等待 ${fmtMinutes(m.waitMin)}${m.extraInboundMin ? ` + 额外入库 ${fmtMinutes(m.extraInboundMin)}` : ''} + ΣC/T ${fmtMinutes(m.processingMin)}${m.pltUsesCriticalPath ? '（与图底时间阶梯一致）' : ''}</span></td></tr>
+                <tr><th>Processing Time</th><td>${esc(m.summaryLabels.processing)}${provBadge(d, m.pltUsesCriticalPath ? '关键路径 ΣC/T' : 'ΣC/T')}</td></tr>
+                <tr><th>等待时间合计</th><td>${fmtMinutes(m.waitMin)}${provBadge(d, `Σ${sumScope}等待`)}</td></tr>
+                <tr><th>换型 C/O 合计</th><td>${fmtMinutes(m.setupMin)}${provBadge(d, 'Σ各工序 C/O（含并行支线）')}</td></tr>
+                <tr class="highlight"><th>Value-Added Ratio</th><td>${esc(m.summaryLabels.va)}${provBadge(d, 'Processing ÷ PLT')}</td></tr>
+                <tr><th>累计良品率</th><td>${fmtPct(m.rolledYield)}${provBadge(d, '各工序合格率连乘')}</td></tr>
+                <tr class="highlight"><th>OEE（工序均值）</th><td>${fmtPct(m.avgOee)}${m.avgOee != null ? provBadge(d, '各工序 OEE 算术平均') : ''}<br><span class="hint">OEE = 可用率 × 性能率 × 质量率；无性能率时按 100%</span></td></tr>
+                <tr><th>最低 OEE 工序</th><td>${m.minOeeRow
+                    ? `${esc(m.minOeeRow.id)} ${esc(m.minOeeRow.name)}（${fmtPct(m.minOeeRow.oee)}）${provBadge(d, '各工序 OEE 取最小')}`
+                    : '—'}</td></tr>
+                <tr><th>批量 Batch</th><td>${m.metaBatch != null ? m.metaBatch + ' 件/批' : '—'}${provBadge(inp, '表内批量', 'simulated')}</td></tr>
+                <tr><th>班次 Available</th><td>${m.availableGlobal != null ? fmtMinutes(m.availableGlobal) : '—'}${provBadge(inp, '班次可用时间', 'simulated')}</td></tr>
+                <tr><th>客户节拍 Takt</th><td>${m.taktMin != null ? fmtMinutes(m.taktMin) + provBadge(d, 'Available ÷ 日需求') : '—'}</td></tr>
+                <tr class="danger"><th>瓶颈工序</th><td>${bn}${provBadge(d, '按 C/T 最长或标记瓶颈')}</td></tr>
+            </table>
+        `;
+    }
+
+    function renderMetricsProcess(m) {
+        const rows = m.rows.map((r) => {
+            const pv = r.provenance || {};
+            const cpTag = m.pltUsesCriticalPath
+                ? (r.onCriticalPath
+                    ? ' <span class="hint">·关键路径</span>'
+                    : ' <span class="hint">·并行支线（不计入 PLT）</span>')
+                : '';
+            return `
+            <tr class="${r.isBottleneck ? 'danger' : ''}">
+                <td><strong>${esc(r.id)}</strong><br>${esc(r.name)}${cpTag}${provFrom(pv, '_row')}</td>
+                <td>
+                    C/T：${fmtMinutes(r.ct)}${provFrom(pv, 'cycle_time_minutes')}<br>
+                    C/O：${fmtMinutes(r.co)}${provFrom(pv, 'setup_time_minutes')}<br>
+                    等待：${fmtMinutes(r.wait)}${provFrom(pv, 'wait_time_minutes')}<br>
+                    Available：${r.available != null ? fmtMinutes(r.available) : '—'}${provFrom(pv, 'available_time_minutes')}<br>
+                    批量：${r.batchSize ?? '—'}${provFrom(pv, 'batch_size')}<br>
+                    稼动率：${r.uptime != null ? fmtPct(r.uptime) : '—'}${provFrom(pv, 'availability_rate')}<br>
+                    性能率：${fmtPct(r.performanceRate)}${r.performanceAssumed
+                        ? provBadge('derived', '缺省 100%（表内无 performance_rate）')
+                        : provFrom(pv, 'performance_rate')}<br>
+                    合格率：${r.yieldRate != null ? fmtPct(r.yieldRate) : '—'}${provFrom(pv, 'quality_yield')}<br>
+                    OEE：${r.oee != null ? fmtPct(r.oee) : '—'}${r.oee != null
+                        ? provBadge('derived', '可用率 × 性能率 × 质量率')
+                        : ''}<br>
+                    人数：${r.operators ?? '—'}${provFrom(pv, 'operators')}<br>
+                    日产能：${r.dailyCapacity != null ? r.dailyCapacity.toFixed(2) + ' 件/日' : '—'}${r.dailyCapacity != null ? provBadge('derived', 'Available ÷ C/T') : ''}<br>
+                    实际日产能：${r.actualDailyCapacity != null ? r.actualDailyCapacity.toFixed(2) + ' 件/日' : '—'}${r.actualDailyCapacity != null ? provBadge('derived', '(Available × Uptime) ÷ C/T') : ''}<br>
+                    批量加工：${r.batchProcessTime != null ? fmtMinutes(r.batchProcessTime) : '—'}${r.batchProcessTime != null ? provBadge('derived', 'Batch×C/T + C/O') : ''}
+                    ${r.resources ? `<br>资源：${esc(r.resources)}` : ''}
+                    ${r.dataStatus ? `<br><span class="hint">行状态：${esc(r.dataStatus)}</span>` : ''}
+                </td>
+            </tr>
+        `;
+        }).join('');
+        return `
+            ${renderProvenanceLegend(m)}
+            <h4>工序数据框计算结果</h4>
+            <table class="metrics-kv">
+                <tr><th>工序</th><th>关键参数</th></tr>
+                ${rows || '<tr><td colspan="2">无工序数据</td></tr>'}
+            </table>
+        `;
+    }
+
+    function renderMetricsLoss(m) {
+        const waitRows = m.waitTop.map((r, i) => `
+            <tr class="${i === 0 ? 'danger' : ''}">
+                <td>#${i + 1} ${esc(r.id)} ${esc(r.name)}</td>
+                <td>${fmtMinutes(r.wait)}${provFrom(r.provenance, 'wait_time_minutes')}（占等待 ${m.waitMin > 0 ? ((r.wait / m.waitMin) * 100).toFixed(1) : 0}%${provBadge('derived', '该等待 ÷ Σ等待')}）</td>
+            </tr>
+        `).join('');
+        const ctRows = m.ctTop.map((r, i) => `
+            <tr class="${i === 0 ? 'highlight' : ''}">
+                <td>#${i + 1} ${esc(r.id)} ${esc(r.name)}</td>
+                <td>${fmtMinutes(r.ct)}${provFrom(r.provenance, 'cycle_time_minutes')}（占加工 ${m.processingMin > 0 ? ((r.ct / m.processingMin) * 100).toFixed(1) : 0}%${provBadge('derived', '该 C/T ÷ ΣC/T')}）</td>
+            </tr>
+        `).join('');
+        return `
+            ${renderProvenanceLegend(m)}
+            <h4>等待贡献 Top${m.pltUsesCriticalPath ? '（关键路径）' : ''}</h4>
+            <table class="metrics-kv">
+                <tr><th>位置</th><th>等待 / 占比</th></tr>
+                ${waitRows || '<tr><td colspan="2">无等待数据</td></tr>'}
+            </table>
+            <h4>加工 C/T 贡献 Top${m.pltUsesCriticalPath ? '（关键路径）' : ''}</h4>
+            <table class="metrics-kv">
+                <tr><th>工序</th><th>C/T / 占比</th></tr>
+                ${ctRows || '<tr><td colspan="2">无加工数据</td></tr>'}
+            </table>
+        `;
+    }
+
+    function renderMetricsFormulas(m) {
+        const items = [
+            {
+                name: '客户节拍 Takt Time',
+                eq: 'Takt = Available Production Time ÷ Customer Demand',
+                note: '可用生产时间 ÷ 客户日需求；无日需求时不计算。'
+            },
+            {
+                name: '工序日产能 Daily Capacity',
+                eq: 'Daily Capacity = Available Time ÷ C/T\nActual = (Available Time × Uptime) ÷ C/T',
+                note: '评估瓶颈：实际日产能最低的工序通常是约束点。'
+            },
+            {
+                name: '批量加工时间',
+                eq: 'Batch Processing Time = Batch Size × C/T + C/O',
+                note: '含换型的批量作业时长。'
+            },
+            {
+                name: 'Processing Time（总加工时间）',
+                eq: 'Processing Time = Σ 各工序 C/T',
+                note: '价值流阶梯下层合计；通常作为增值时间近似。'
+            },
+            {
+                name: '库存等待时间 Waiting Time',
+                eq: 'Waiting = Inventory Qty ÷ Daily Demand（或日消耗）\n或直接使用字段 wait_time_minutes',
+                note: '本面板优先使用 JSON/Excel 中已折算的等待分钟。'
+            },
+            {
+                name: 'Production Lead Time',
+                eq: '串行：PLT = Σ Waiting + Σ C/T\n并行：PLT = Σ_关键路径 (Waiting + C/T)',
+                note: '有分叉/合流时与图底时间阶梯一致：取等待+C/T 最长路径，并行支线时间不重复相加。必须 ≥ Processing Time。'
+            },
+            {
+                name: 'VA Ratio（增值比）',
+                eq: 'VA Ratio = (VA Time ÷ PLT) × 100%\n本工具默认 VA Time ≈ Processing Time（并行时亦为关键路径 ΣC/T）',
+                note: '用于判断整体浪费程度。'
+            },
+            {
+                name: '累计良品率 Rolled Yield',
+                eq: 'Rolled Yield = ∏ 各工序 Yield',
+                note: '各工序合格率连乘。'
+            },
+            {
+                name: '设备综合效率 OEE',
+                eq: 'OEE = Availability × Performance × Quality\n本工具：OEE = 稼动率 × 性能率 × 合格率',
+                note: '可用率用表内稼动率（Uptime）；质量率用一次合格率；性能率读 ie_data.performance_rate，缺省按 100%。总览给出工序 OEE 均值与最低 OEE 工序。'
+            },
+            {
+                name: '容器数量 Containers',
+                eq: 'Containers = Inventory Quantity ÷ Container Capacity',
+                note: '有库存件数与容器容量时可算。'
+            }
+        ];
+        const legend = m ? renderProvenanceLegend(m) : '';
+        return `${legend}<h4>公式说明</h4>` + items.map((it) => `
+            <div class="metrics-formula">
+                <div class="name">${esc(it.name)} ${provBadge('derived')}</div>
+                <div class="eq">${esc(it.eq).replace(/\n/g, '<br>')}</div>
+                <div class="note">${esc(it.note)}</div>
+            </div>
+        `).join('');
+    }
+
+    function vsmExportBaseName() {
+        if (currentTab === 'symbols') return 'VSM_标准符号表';
+        const meta = lastLayout?.data?.value_stream_meta?.name || lastLayout?.data?.name;
+        if (meta) {
+            return String(meta).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').slice(0, 48);
+        }
+        return 'VSM_价值流图';
+    }
+
+    function escXmlDrawio(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    /** 串行图没有 graphLayout 时，用列坐标拼一份导出用布局 */
+    function buildLinearExportLayout(L) {
+        const layout = {};
+        let x = 0;
+        const yFlow = 160;
+        (L.cols || []).forEach((col, i) => {
+            const w = (L.widths && L.widths[i]) != null ? L.widths[i] : colWidth(col);
+            if (col.type === 'truck-in') {
+                layout.__INBOUND__ = {
+                    xLeft: x, xCenter: x + w / 2, xRight: x + w, yFlow
+                };
+            } else if (col.type === 'truck-out') {
+                layout.__OUTBOUND__ = {
+                    xLeft: x, xCenter: x + w / 2, xRight: x + w, yFlow
+                };
+            } else if (col.type === 'process' && col.id) {
+                layout[col.id] = {
+                    xLeft: x, xCenter: x + w / 2, xRight: x + w, yFlow, rank: i
+                };
+            }
+            x += w;
+        });
+        return layout;
+    }
+
+    function getDrawioExportContext() {
+        const L = lastLayout;
+        if (!L?.data) return null;
+        const graph = L.data.graph
+            || (Array.isArray(lastMacroRaw?.processes)
+                ? buildProcessGraph(lastMacroRaw.processes)
+                : null);
+        if (!graph?.processIds?.length) return null;
+
+        let layout = L.graphLayout?.layout || null;
+        if (!layout) layout = buildLinearExportLayout(L);
+        if (!layout || !Object.keys(layout).length) return null;
+        return { L, data: L.data, graph, layout };
+    }
+
+    function processDrawioLabel(p) {
+        const lines = [p.name || p.id || '工序'];
+        const data = p.data || {};
+        ['C/T', 'C/O', '稼动率', '性能率', '一次合格率', 'OEE'].forEach((k) => {
+            if (data[k] != null && String(data[k]).trim() !== '') {
+                lines.push(`${k}: ${data[k]}`);
+            }
+        });
+        if (p.is_bottleneck || (p.name && String(p.name).includes('瓶颈'))) {
+            lines.push('[瓶颈]');
+        }
+        return lines.map(escXmlDrawio).join('&#xa;');
+    }
+
+    function buildDrawioXml(ctx) {
+        const { data, graph, layout } = ctx;
+        const boxW = Math.max(LAYOUT.process, 150);
+        const boxH = 128;
+        const truckW = 90;
+        const truckH = 56;
+        const invSize = 28;
+        let cells = '';
+        let uid = 1;
+        const nextId = (prefix) => `${prefix}${uid++}`;
+
+        const title = lastMacroRaw?.value_stream_meta?.name
+            || data.value_stream_meta?.name
+            || data.name
+            || '价值流图';
+        const cp = Array.isArray(data.criticalPath)
+            ? data.criticalPath.filter((id) => id && !String(id).startsWith('__')).join(' → ')
+            : '';
+        const summary = data.timeline_summary || {};
+        const noteParts = [
+            title,
+            cp ? `关键路径: ${cp}` : '',
+            summary.production_lead_time ? `PLT: ${summary.production_lead_time}` : '',
+            summary.processing_time ? `Processing: ${summary.processing_time}` : '',
+            summary.value_added_ratio ? `VA: ${summary.value_added_ratio}` : ''
+        ].filter(Boolean);
+
+        cells += `
+        <mxCell id="${nextId('note')}" value="${noteParts.map(escXmlDrawio).join('&#xa;')}"
+          style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=12;fontStyle=1"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="8" width="480" height="80" as="geometry"/>
+        </mxCell>`;
+
+        const inPos = layout.__INBOUND__;
+        if (inPos) {
+            const label = data.inbound?.label || '入库';
+            cells += `
+        <mxCell id="__INBOUND__" value="${['卡车', label].map(escXmlDrawio).join('&#xa;')}"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="${Math.round(inPos.xLeft)}" y="${Math.round(inPos.yFlow - truckH / 2)}"
+            width="${truckW}" height="${truckH}" as="geometry"/>
+        </mxCell>`;
+        }
+
+        const outPos = layout.__OUTBOUND__;
+        if (outPos) {
+            const label = data.outbound?.label || '出库';
+            cells += `
+        <mxCell id="__OUTBOUND__" value="${['卡车', label].map(escXmlDrawio).join('&#xa;')}"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="${Math.round(outPos.xLeft)}" y="${Math.round(outPos.yFlow - truckH / 2)}"
+            width="${truckW}" height="${truckH}" as="geometry"/>
+        </mxCell>`;
+        }
+
+        graph.processIds.forEach((id) => {
+            const pos = layout[id];
+            const p = data.processById?.[id];
+            if (!pos || !p) return;
+            const isBn = !!(p.is_bottleneck || (p.name && String(p.name).includes('瓶颈')));
+            const fill = isBn ? '#ffe6cc' : '#dae8fc';
+            const stroke = isBn ? '#d79b00' : '#6c8ebf';
+            const x = Math.round(pos.xLeft);
+            const y = Math.round(pos.yFlow - boxH / 2);
+            cells += `
+        <mxCell id="${escXmlDrawio(id)}" value="${processDrawioLabel(p)}"
+          style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;fontSize=10;fillColor=${fill};strokeColor=${stroke};strokeWidth=${isBn ? 2 : 1};"
+          vertex="1" parent="1">
+          <mxGeometry x="${x}" y="${y}" width="${boxW}" height="${boxH}" as="geometry"/>
+        </mxCell>`;
+        });
+
+        (graph.edges || []).forEach((edge) => {
+            const from = edge.from;
+            const to = edge.to;
+            if (!layout[from] || !layout[to]) return;
+            // 虚拟端点已建成 vertex 时可连；仅工序之间也连
+            const edgeId = nextId('e');
+            const waitStr = edge.wait != null ? minutesToDuration(edge.wait) : '';
+            const label = waitStr && waitStr !== '0' ? waitStr : '';
+            cells += `
+        <mxCell id="${edgeId}" value="${escXmlDrawio(label)}"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0d47a1;strokeWidth=2;fontColor=#c62828;fontStyle=1;fontSize=11;endArrow=block;endFill=1;"
+          edge="1" parent="1" source="${escXmlDrawio(from)}" target="${escXmlDrawio(to)}">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>`;
+
+            // 工序前库存三角（非入库边）
+            if (to !== '__OUTBOUND__' && from !== '__INBOUND__' && layout[to]) {
+                const a = layout[from];
+                const b = layout[to];
+                const ix = Math.round((a.xRight + b.xLeft) / 2 - invSize / 2);
+                const iy = Math.round(((a.yFlow + b.yFlow) / 2) + 18);
+                cells += `
+        <mxCell id="${nextId('inv')}" value="I"
+          style="triangle;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;direction=north;"
+          vertex="1" parent="1">
+          <mxGeometry x="${ix}" y="${iy}" width="${invSize}" height="${invSize}" as="geometry"/>
+        </mxCell>`;
+            }
+        });
+
+        // 供应商 / 客户（信息层示意，通用矩形，避免依赖 lean 形状库）
+        if (data.supplier?.name && inPos) {
+            cells += `
+        <mxCell id="${nextId('sup')}" value="${['供应商', data.supplier.name].map(escXmlDrawio).join('&#xa;')}"
+          style="shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;"
+          vertex="1" parent="1">
+          <mxGeometry x="${Math.round(inPos.xLeft)}" y="90" width="100" height="50" as="geometry"/>
+        </mxCell>`;
+        }
+        if (data.customer?.name && outPos) {
+            cells += `
+        <mxCell id="${nextId('cust')}" value="${['客户', data.customer.name].map(escXmlDrawio).join('&#xa;')}"
+          style="shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;"
+          vertex="1" parent="1">
+          <mxGeometry x="${Math.round(outPos.xLeft)}" y="90" width="100" height="50" as="geometry"/>
+        </mxCell>`;
+        }
+
+        const pageW = Math.max(1200, Math.round((L_totalWidth(ctx) || 1400) + 80));
+        const pageH = Math.max(800, Math.round(estimateDrawioPageHeight(layout) + 120));
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="${new Date().toISOString()}" agent="vsm-macro" version="22.0.0" type="device">
+  <diagram id="vsm-export" name="${escXmlDrawio(title)}">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="${pageW}" pageHeight="${pageH}" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+${cells}
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+    }
+
+    function L_totalWidth(ctx) {
+        const L = ctx.L;
+        if (L.graphLayout?.totalW) return L.graphLayout.totalW;
+        if (L.timelineW) return L.timelineW;
+        if (L.totalW) return L.totalW;
+        return null;
+    }
+
+    function estimateDrawioPageHeight(layout) {
+        let maxY = 400;
+        Object.keys(layout || {}).forEach((k) => {
+            const y = Number(layout[k]?.yFlow) || 0;
+            if (y > maxY) maxY = y;
+        });
+        return maxY + 220;
+    }
+
+    function downloadDrawio() {
+        if (currentTab === 'symbols') {
+            alert('符号表页请先切到价值流图并渲染后再导出。');
+            return;
+        }
+        const ctx = getDrawioExportContext();
+        if (!ctx) {
+            alert('请先渲染价值流图，再导出 Draw.io。');
+            return;
+        }
+        try {
+            const xml = buildDrawioXml(ctx);
+            const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+            const ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '_');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${vsmExportBaseName()}_${ts}.drawio`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
+        } catch (e) {
+            alert('导出 Draw.io 失败：' + (e.message || e));
+        }
+    }
+
+    async function saveVsmAsImage() {
+        const btn = document.getElementById('btn-save-image');
+        const out = document.getElementById('output');
+        const target = out.querySelector('.vsm-template, .symbol-sheet');
+        if (!target) {
+            alert('请先在左侧渲染价值流图，再保存图片。');
+            return;
+        }
+        if (typeof html2canvas !== 'function') {
+            alert('图片导出库未加载，请检查网络后刷新页面重试。');
+            return;
+        }
+
+        const prevText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '正在生成图片…';
+        try {
+            const canvas = await html2canvas(target, {
+                backgroundColor: '#ffffff',
+                scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
+                useCORS: true,
+                logging: false,
+                width: target.scrollWidth,
+                height: target.scrollHeight,
+                windowWidth: target.scrollWidth,
+                windowHeight: target.scrollHeight,
+                scrollX: 0,
+                scrollY: 0,
+                onclone: (doc) => {
+                    const cloned = doc.querySelector('.vsm-template, .symbol-sheet');
+                    if (cloned) cloned.style.background = '#fff';
+                }
+            });
+            const ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '_');
+            const link = document.createElement('a');
+            link.download = `${vsmExportBaseName()}_${ts}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            alert('保存图片失败：' + (e.message || e));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = prevText;
+        }
+    }
+
+    function render() {
+        const out = document.getElementById('output');
+        const err = document.getElementById('error');
+        try {
+            if (currentTab === 'symbols') {
+                activeInlineEditor = null;
+                err.style.display = 'none';
+                out.innerHTML = renderSymbolSheet();
+                return;
+            }
+            const raw = JSON.parse(document.getElementById('json-input').value);
+            const { data } = normalizeInput(raw);
+            if (!data.processes?.length) throw new Error('processes 不能为空');
+
+            err.style.display = 'none';
+            lastMacroRaw = raw;
+            lastMetrics = computeVsmMetrics(raw, data);
+            out.innerHTML = renderMap(data);
+            requestAnimationFrame(() => drawLadder());
+            if (metricsPanelOpen) refreshMetricsPanel();
+        } catch (e) {
+            activeInlineEditor = null;
+            lastMacroRaw = null;
+            lastMetrics = null;
+            err.textContent = e.message;
+            err.style.display = 'block';
+            if (metricsPanelOpen) refreshMetricsPanel();
+        }
+    }
+
+    document.getElementById('json-input').value = JSON.stringify(DEFAULT_DATA, null, 2);
+    document.getElementById('nl-input').value = NL_EXAMPLE_TEXT;
+    loadNlSettings();
+    ['nl-api-key', 'nl-model', 'nl-base-url'].forEach((id) => {
+        document.getElementById(id).addEventListener('change', saveNlSettings);
+    });
+    switchInputMode('nl');
+    initMapInlineEdit();
+    render();
+    </script>
+</body>
+</html>

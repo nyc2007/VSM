@@ -1,0 +1,338 @@
+{
+  "value_stream_meta": {
+    "name": "电机转子价值流（复杂并行·现状）",
+    "state": "current",
+    "product": "4YM0 转子总成",
+    "family": "中型异步电机转子族",
+    "available_time_minutes": 450,
+    "batch_size": 8,
+    "daily_demand": 24,
+    "note": "两段并行：机加长支线 vs 冲片短支线；合装后质检旁路再合流发运"
+  },
+  "customer_demand_per_day": 24,
+  "available_time_minutes": 450,
+  "macro_entities": {
+    "supplier": { "name": "轴材/硅钢供应商" },
+    "customer": { "name": "总装厂（内部客户）" },
+    "production_control": { "name": "PMC 生产计划科" }
+  },
+  "macro_flows": [
+    {
+      "from": "production_control",
+      "to": "supplier",
+      "type": "electronic_info",
+      "content": "周采购计划 / 到货窗口"
+    },
+    {
+      "from": "customer",
+      "to": "production_control",
+      "type": "electronic_info",
+      "content": "三日滚动需求"
+    },
+    {
+      "from": "production_control",
+      "to": "customer",
+      "type": "electronic_info",
+      "content": "齐套承诺 / 发运计划"
+    },
+    {
+      "from": "production_control",
+      "to": "P01",
+      "type": "electronic_info",
+      "content": "日派工单"
+    },
+    {
+      "from": "production_control",
+      "to": "P03",
+      "type": "manual_info",
+      "content": "冲片批次卡"
+    }
+  ],
+  "inbound": {
+    "label": "轴材+硅钢入库",
+    "wait_time_minutes": 2880,
+    "inventory_qty": 48
+  },
+  "outbound": {
+    "label": "转子发往总装"
+  },
+  "processes": [
+    {
+      "id": "P01",
+      "name": "来料检验与分拣",
+      "predecessors": [],
+      "timeline": {
+        "wait_time_minutes": 2880,
+        "setup_time_minutes": 20,
+        "cycle_time_minutes": 45,
+        "raw_process_minutes": 40,
+        "inventory_qty": 48
+      },
+      "resources": ["检验台", "光谱仪"],
+      "ie_data": {
+        "operators": 2,
+        "availability_rate": 0.92,
+        "performance_rate": 0.95,
+        "quality_yield": 0.995,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有+模拟",
+      "uaf_mapping": {
+        "operational_activity": "OA-收货检验"
+      }
+    },
+    {
+      "id": "P02",
+      "name": "轴粗车（支线A起点）",
+      "predecessors": ["P01"],
+      "timeline": {
+        "wait_time_minutes": 1440,
+        "setup_time_minutes": 90,
+        "cycle_time_minutes": 180,
+        "raw_process_minutes": 160,
+        "inventory_qty": 24
+      },
+      "resources": ["数控车床-1"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.85,
+        "performance_rate": 0.9,
+        "quality_yield": 0.99,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-轴粗加工"
+      }
+    },
+    {
+      "id": "P02B",
+      "name": "轴精车+键槽",
+      "predecessors": ["P02"],
+      "timeline": {
+        "wait_time_minutes": 720,
+        "setup_time_minutes": 120,
+        "cycle_time_minutes": 240,
+        "raw_process_minutes": 220,
+        "inventory_qty": 16
+      },
+      "resources": ["数控车床-2", "插床"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.82,
+        "performance_rate": 0.88,
+        "quality_yield": 0.985,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "is_bottleneck": true,
+      "bottleneck_reason": "精车+键槽 C/T 最长，约束支线A与整条关键路径",
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-轴精加工"
+      }
+    },
+    {
+      "id": "P02C",
+      "name": "轴探伤与动平衡预检",
+      "predecessors": ["P02B"],
+      "timeline": {
+        "wait_time_minutes": 480,
+        "setup_time_minutes": 30,
+        "cycle_time_minutes": 60,
+        "raw_process_minutes": 55,
+        "inventory_qty": 12
+      },
+      "resources": ["磁粉探伤", "动平衡机"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.9,
+        "performance_rate": 1.0,
+        "quality_yield": 0.998,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有+模拟",
+      "uaf_mapping": {
+        "operational_activity": "OA-轴质量确认"
+      }
+    },
+    {
+      "id": "P03",
+      "name": "硅钢冲片（支线B）",
+      "predecessors": ["P01"],
+      "timeline": {
+        "wait_time_minutes": 960,
+        "setup_time_minutes": 180,
+        "cycle_time_minutes": 90,
+        "raw_process_minutes": 75,
+        "inventory_qty": 32
+      },
+      "resources": ["高速冲床"],
+      "ie_data": {
+        "operators": 2,
+        "availability_rate": 0.78,
+        "performance_rate": 0.92,
+        "quality_yield": 0.97,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-冲片"
+      }
+    },
+    {
+      "id": "P03B",
+      "name": "叠压与扣片",
+      "predecessors": ["P03"],
+      "timeline": {
+        "wait_time_minutes": 360,
+        "setup_time_minutes": 45,
+        "cycle_time_minutes": 75,
+        "raw_process_minutes": 70,
+        "inventory_qty": 20
+      },
+      "resources": ["液压叠压机"],
+      "ie_data": {
+        "operators": 2,
+        "availability_rate": 0.88,
+        "performance_rate": 0.95,
+        "quality_yield": 0.99,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-铁芯叠压"
+      }
+    },
+    {
+      "id": "P04",
+      "name": "热套合装（第一次合流）",
+      "predecessors": ["P02C", "P03B"],
+      "timeline": {
+        "wait_time_minutes": 1440,
+        "setup_time_minutes": 60,
+        "cycle_time_minutes": 150,
+        "raw_process_minutes": 140,
+        "inventory_qty": 10
+      },
+      "resources": ["加热炉", "压装机"],
+      "ie_data": {
+        "operators": 3,
+        "availability_rate": 0.86,
+        "performance_rate": 0.9,
+        "quality_yield": 0.992,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有+模拟",
+      "uaf_mapping": {
+        "operational_activity": "OA-轴芯合装"
+      }
+    },
+    {
+      "id": "P05",
+      "name": "铸铝 / 端环加工",
+      "predecessors": ["P04"],
+      "timeline": {
+        "wait_time_minutes": 2160,
+        "setup_time_minutes": 150,
+        "cycle_time_minutes": 200,
+        "raw_process_minutes": 180,
+        "inventory_qty": 14
+      },
+      "resources": ["压铸机", "车床"],
+      "ie_data": {
+        "operators": 2,
+        "availability_rate": 0.8,
+        "performance_rate": 0.85,
+        "quality_yield": 0.96,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-铸铝端环"
+      }
+    },
+    {
+      "id": "P06A",
+      "name": "动平衡精修（主路）",
+      "predecessors": ["P05"],
+      "timeline": {
+        "wait_time_minutes": 600,
+        "setup_time_minutes": 40,
+        "cycle_time_minutes": 90,
+        "raw_process_minutes": 85,
+        "inventory_qty": 8
+      },
+      "resources": ["动平衡精修站"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.9,
+        "performance_rate": 0.93,
+        "quality_yield": 0.995,
+        "available_time_minutes": 450,
+        "batch_size": 4
+      },
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-动平衡"
+      }
+    },
+    {
+      "id": "P06B",
+      "name": "尺寸/形位全检（并行质检）",
+      "predecessors": ["P05"],
+      "timeline": {
+        "wait_time_minutes": 480,
+        "setup_time_minutes": 15,
+        "cycle_time_minutes": 55,
+        "raw_process_minutes": 50,
+        "inventory_qty": 8
+      },
+      "resources": ["三坐标", "检具"],
+      "ie_data": {
+        "operators": 1,
+        "availability_rate": 0.95,
+        "performance_rate": 1.0,
+        "quality_yield": 0.999,
+        "available_time_minutes": 450,
+        "batch_size": 4
+      },
+      "data_status": "已有+模拟",
+      "uaf_mapping": {
+        "operational_activity": "OA-全尺寸检验"
+      }
+    },
+    {
+      "id": "P07",
+      "name": "终检包装入库（第二次合流）",
+      "predecessors": ["P06A", "P06B"],
+      "timeline": {
+        "wait_time_minutes": 720,
+        "setup_time_minutes": 20,
+        "cycle_time_minutes": 40,
+        "raw_process_minutes": 35,
+        "inventory_qty": 24
+      },
+      "resources": ["包装线", "成品库位"],
+      "ie_data": {
+        "operators": 2,
+        "availability_rate": 0.93,
+        "performance_rate": 0.98,
+        "quality_yield": 1.0,
+        "available_time_minutes": 450,
+        "batch_size": 8
+      },
+      "data_status": "已有",
+      "uaf_mapping": {
+        "operational_activity": "OA-成品放行"
+      }
+    }
+  ]
+}
